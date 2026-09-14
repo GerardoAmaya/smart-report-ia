@@ -28,10 +28,14 @@ _model_probe_cache: tuple[float, Check] | None = None
 
 
 def head_revision() -> str | None:
-    """Ultima migracion que existe en el repositorio."""
-    script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    return script.get_current_head()
+    """Ultima migracion que existe en el repositorio.
 
+    `script_location` en el ini es relativo al directorio de trabajo, que bajo
+    uvicorn no es el mismo que al correr alembic a mano. Se fija absoluto.
+    """
+    config = Config(str(ALEMBIC_INI))
+    config.set_main_option("script_location", str(ALEMBIC_INI.parent / "alembic"))
+    return ScriptDirectory.from_config(config).get_current_head()
 
 def check_database(engine: Engine) -> dict[str, Check]:
     """PostGIS y revision de esquema en una sola conexion."""

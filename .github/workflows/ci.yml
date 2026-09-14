@@ -74,10 +74,20 @@ jobs:
       - name: Migraciones en ambas direcciones
         # Una migracion que sube pero no baja se descubre el dia que hay que
         # revertir en produccion. Se comprueba en cada commit.
+        #
+        # **Contra la base que crea la imagen de PostGIS**, no contra una
+        # creada a mano: la imagen instala cinco extensiones y una base recien
+        # creada con CREATE DATABASE trae solo la que pone la migracion. La
+        # bajada de 0001 fallaba unicamente en la primera, asi que comprobarlo
+        # en la segunda daba verde sobre una base que no se parece a esta.
         run: |
+          psql "$DATABASE_URL_PSQL" -tAc \
+            "SELECT string_agg(extname, ', ' ORDER BY extname) FROM pg_extension;"
           alembic upgrade head
           alembic downgrade base
           alembic upgrade head
+        env:
+          DATABASE_URL_PSQL: postgresql://smart_report:smart_report@localhost:5432/smart_report
 
       - name: Seeders
         # Idempotentes por contrato: correrlos dos veces tiene que dejar lo

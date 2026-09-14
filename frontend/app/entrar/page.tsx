@@ -18,11 +18,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useQueryClient } from "@tanstack/react-query";
+
 import { api } from "@/lib/api";
 import { MarcaGoogle, MarcaTelegram } from "@/componentes/Marcas-svg";
 
 export default function Entrar() {
   const router = useRouter();
+  const cliente = useQueryClient();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -32,9 +35,16 @@ export default function Entrar() {
     setEnviando(true);
     setError(null);
     try {
-      await api.entrarDePrueba(password);
+      const perfil = await api.entrarDePrueba(password);
+      // Se siembra el perfil en la cache antes de navegar.
+      //
+      // Sin esto el tablero rebota de vuelta aqui: la consulta "yo" quedo en
+      // estado de error del intento anterior —y no se reintenta a proposito,
+      // porque sin sesion no va a mejorar sola—, asi que al llegar al tablero
+      // seguia creyendo que no hay sesion. Con una recarga a mano funcionaba;
+      // navegando, no. Lo encontro una prueba extremo a extremo.
+      cliente.setQueryData(["yo"], perfil);
       router.push("/");
-      router.refresh();
     } catch {
       setError("Esa contraseña no es. Revisala y probá de nuevo.");
     } finally {

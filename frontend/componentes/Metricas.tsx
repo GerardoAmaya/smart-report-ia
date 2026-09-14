@@ -47,7 +47,6 @@ export function Metricas() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["metricas"],
     queryFn: () => api.metricas(30),
-    refetchInterval: 30_000,
   });
 
   if (isLoading) {

@@ -1,4 +1,4 @@
-.PHONY: up down logs nuke migrate revision seed test lint fmt health tunnel webhook reports bench retention photos accuracy classifications grouping grouping-eval
+.PHONY: e2e e2e-up up down logs nuke migrate revision seed test lint fmt health tunnel webhook reports bench retention photos accuracy classifications grouping grouping-eval
 
 up:            ## Levanta base, almacenamiento, API y frontend desde cero
 	@test -f .env || cp .env.example .env
@@ -27,6 +27,12 @@ seed:          ## Datos de siembra. Idempotente: se puede correr siempre.
 
 test:
 	docker compose exec api pytest -q
+
+e2e:           ## Pruebas extremo a extremo contra el sistema levantado
+	@./scripts/e2e.sh $(args)
+
+e2e-up:        ## Solo levanta el sistema con el Telegram falso
+	@./scripts/e2e.sh --solo-levantar
 
 lint:
 	docker compose exec api ruff check .

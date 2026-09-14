@@ -104,6 +104,7 @@ export const ReporteSchema = z.object({
   photos: z.array(FotoSchema),
   classification: z
     .object({
+      id: z.string(),
       proposed_category: z.string().nullable(),
       final_category: z.string().nullable(),
       severity: z.string().nullable(),

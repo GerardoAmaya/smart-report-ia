@@ -183,7 +183,13 @@ class TelegramChannel:
         token = settings.telegram_bot_token.get_secret_value()
         if not token:
             raise RuntimeError("TELEGRAM_BOT_TOKEN sin definir")
-        return Bot(token)
+        # base_url redirigible: permite probar el camino entero contra un
+        # Telegram falso, sin cuenta ni fotos reales en cada corrida de CI.
+        return Bot(
+            token,
+            base_url=settings.telegram_api_base_url,
+            base_file_url=settings.telegram_api_file_url,
+        )
 
     async def fetch_media(self, external_file_id: str) -> bytes:
         """Descarga un archivo. Lo usa el trabajador de la fase 2."""

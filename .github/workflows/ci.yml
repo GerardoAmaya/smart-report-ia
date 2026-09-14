@@ -116,3 +116,58 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+
+  e2e:
+    # Extremo a extremo **contra el sistema levantado**, no contra
+    # simulaciones. Es lo que PLAN.md exige para dar la fase 7 por terminada:
+    # una prueba que simula la API comprueba que el frontend se entiende
+    # consigo mismo, no que el sistema funciona.
+    #
+    # Se levanta todo con compose —incluido un Telegram falso, para no
+    # necesitar una cuenta ni fotos reales— y Playwright lo usa tal cual.
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Configuracion
+        # Los secretos se generan en la corrida: estas pruebas no hablan con
+        # Telegram ni con Google de verdad, asi que no hacen falta credenciales
+        # reales. La del modelo si, porque la clasificacion es parte del camino.
+        run: |
+          cp .env.example .env
+          {
+            echo "SESSION_SECRET=$(openssl rand -hex 32)"
+            echo "TELEGRAM_WEBHOOK_SECRET=$(openssl rand -hex 32)"
+            echo "TELEGRAM_BOT_TOKEN=000:ci"
+            echo "DEMO_PASSWORD=$(openssl rand -hex 12)"
+            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}"
+          } >> .env
+
+      - name: Levantar el sistema
+        run: make e2e-up
+
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Los tres recorridos
+        run: make e2e args="--reporter=list"
+
+      - name: Que paso si fallo
+        if: failure()
+        run: docker compose --profile e2e logs --tail 120
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

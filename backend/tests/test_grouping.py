@@ -160,7 +160,7 @@ def test_la_misma_foto_lejos_no_fuerza_la_union(session):
         )
     ).scalar_one()
     assert ev.visual_distance == 0
-    assert "reenvio" in ev.reason
+    assert "reenvío" in ev.reason
 
 
 def test_sin_categoria_confirmada_no_se_agrupa(session):
@@ -269,7 +269,7 @@ def test_la_evidencia_esta_en_español_y_se_entiende(session):
 
     # Un operador que no vio el sistema tiene que entender por que no se junto.
     assert "metros" in ev.reason or " m " in ev.reason
-    assert "revision" in ev.reason.lower()
+    assert "revisión" in ev.reason.lower()
 
 
 # --- Deshacer ---
@@ -389,3 +389,29 @@ def test_la_severidad_no_baja_al_entrar_uno_leve(session):
 
     session.refresh(caso)
     assert caso.severity == "alta"
+
+
+def test_los_motivos_van_en_español_correcto(session):
+    """Lo que lee un operador no puede estar sin tildes.
+
+    Los comentarios del codigo van sin ellas por comodidad; estos textos no: se
+    muestran tal cual en el tablero, y "categoria" sin tilde es una falta.
+    """
+    a = crear_reporte(session)
+    agrupar(session, a)
+    p = desplazar(12)
+    b = crear_reporte(session, lat=p[0], lon=p[1], usuario="2")
+    agrupar(session, b)
+
+    motivos = (
+        session.execute(select(GroupingEvidence.reason).where(GroupingEvidence.report_id == b.id))
+        .scalars()
+        .all()
+    )
+    texto = " ".join(motivos)
+
+    # Palabras que aparecen en estos motivos y llevan tilde.
+    for palabra in ("categoría",):
+        assert palabra in texto, f"falta la tilde en {palabra!r}: {texto}"
+    for sin_tilde in ("categoria", "revision", "reenvio", "automaticamente", "limite"):
+        assert sin_tilde not in texto, f"{sin_tilde!r} aparece sin tilde: {texto}"

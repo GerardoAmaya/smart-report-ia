@@ -226,6 +226,10 @@ def detalle_del_caso(
                 ],
                 "classification": (
                     {
+                        # El id: cualquier cliente que quiera actuar sobre la
+                        # clasificacion lo necesita, y sin el la representacion
+                        # esta incompleta.
+                        "id": str(clasificacion.id),
                         "proposed_category": clasificacion.proposed_category,
                         "final_category": clasificacion.final_category,
                         "severity": clasificacion.final_severity,

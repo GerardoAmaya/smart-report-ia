@@ -15,6 +15,7 @@ from app.health import build_health
 from app.routes_auth import router as auth_router
 from app.routes_board import router as board_router
 from app.security import BodySizeLimitMiddleware, SecurityHeadersMiddleware, body_was_truncated
+from app.stream import router as stream_router
 from app.webhook import router as webhook_router
 
 logging_setup.configure()
@@ -75,6 +76,7 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.include_router(webhook_router)
 app.include_router(auth_router)
 app.include_router(board_router)
+app.include_router(stream_router)
 
 
 @app.exception_handler(RequestValidationError)

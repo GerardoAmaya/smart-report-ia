@@ -71,7 +71,6 @@ export function Mapa({
   const { data } = useQuery({
     queryKey: ["mapa"],
     queryFn: api.mapa,
-    refetchInterval: 15_000,
   });
 
   // El mapa se crea **una sola vez**. Con `oscuro` en las dependencias, este

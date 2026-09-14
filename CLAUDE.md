@@ -37,7 +37,7 @@ Este principio no se negocia: es lo que hace el sistema verificable.
 
 ## Estado
 
-**Fases 0, 1 y 2 cerradas y verificadas. Fases 3 a 6 escritas.** Lo que
+**Fases 0, 1, 2 y 7 cerradas y verificadas. Fases 3 a 6 escritas.** Lo que
 existe:
 
 - `InboundChannel` como contrato, con Telegram como primera implementación
@@ -50,8 +50,10 @@ existe:
   contraseña, y permisos comprobados en la API
 - Despacho: asignar cuadrilla, cerrar con foto de evidencia, y **aviso de
   vuelta a todos los que reportaron**, encolado y con reintentos
-- Dieciocho migraciones, una por tabla, y seeders versionados aparte
-- 197 pruebas en verde y CI en verde
+- Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
+- Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
+- Diecinueve migraciones, una por tabla, y seeders versionados aparte
+- 198 pruebas y 9 recorridos en verde, CI en verde
 
 **Las fases 3, 4 y 5 no están cerradas**, y cada una espera una verificación que
 no se puede fabricar:
@@ -63,11 +65,14 @@ no se puede fabricar:
 | 5 — el tablero | Alguien que no vio el sistema mira un caso agrupado y lo entiende solo |
 | 6 — despacho | El ciclo completo con un reporte real: de la foto al aviso de cerrado |
 
+(La fase 7 sí está cerrada: sus pruebas corren en CI contra el sistema
+levantado, que es exactamente lo que pedía su verificación.)
+
 El código que mide las tres existe y **avisa cuando la muestra no alcanza** en
 vez de dar un número. Las etiquetas de la fase 3 se juntan solas: cada
 confirmación en el bot es una.
 
-**Siguiente: fase 7 — tiempo real y pruebas extremo a extremo.**
+**Siguiente: fase 8 — despliegue.**
 
 ## Decisiones tomadas
 
@@ -302,6 +307,39 @@ MapLibre se quedaba sin posicionar: **los pines se veían** —MapLibre les pone
 estilos en línea— **y el mapa no**. Un fallo mudo, sin error en consola ni en
 red, que parece un problema de teselas y no lo es.
 
+**El tablero se actualiza por SSE sobre `LISTEN/NOTIFY`, sin sondeo.** El
+aviso sale de Postgres, que es donde ya vive la cola: cuando el trabajador
+guarda una foto en su proceso y la API la tiene que enseñar en otro, Postgres ya
+está en medio. SSE y no WebSocket porque el tablero escucha y no habla.
+
+**El aviso de cambio sale de un disparador, no de llamadas en el código.** La
+tentación es avisar a mano en cada sitio que cambia algo, y es así como el
+tablero se queda viejo: basta olvidar uno. Un disparador no se puede olvidar, y
+vive en una migración versionada.
+
+**Por el flujo solo va «algo cambió aquí», nunca la fila.** Mandar el dato
+obligaría a mantener dos formas de leer lo mismo, y la segunda se queda vieja.
+
+**Las pruebas extremo a extremo corren contra el sistema levantado.** Sin
+endpoints de prueba ni escrituras directas: los reportes entran por el webhook
+real. Lo único sustituido es a qué servidor le habla el bot —`TELEGRAM_API_BASE_URL`
+apunta a un Telegram falso— para no necesitar cuenta ni fotos reales en cada
+corrida.
+
+**Las pruebas corrigen la categoría en vez de confirmarla.** La foto que sirve
+el Telegram falso es un patrón generado y el modelo responde `no_es_reporte`,
+**acertando**. Una persona ante eso corrige, así que la prueba corrige: de paso
+cubre el camino de corrección y la categoría deja de depender de lo que el
+modelo opine de una imagen sintética.
+
+**Cada corrida de las pruebas trabaja en su propio sitio del mapa.** Sin eso los
+reportes de una corrida se agrupan con los de la anterior —que es el
+comportamiento correcto— y afirmar cuántos hay en un caso se vuelve imposible.
+
+**Los textos que lee un operador van en español correcto, con tildes.** Los
+comentarios del código pueden ir sin ellas; la evidencia que se muestra en el
+tablero no. Hay una prueba que lo fija.
+
 **Dos formas de entrar (fase 5):** Google para uso normal y contraseña para un
 usuario de prueba público. Google dice quién es, no si puede entrar: la
 autorización es una tabla de correos permitidos con su rol. La contraseña del
@@ -368,6 +406,8 @@ no del proyecto:
 | `make accuracy` | exactitud de clasificación, con las confirmaciones |
 | `make grouping` | casos y evidencia de cada unión |
 | `make grouping-eval f=…` | las dos tasas, por separado |
+| `make e2e` | los tres recorridos contra el sistema levantado |
+| `make e2e-up` | solo levanta el sistema con el Telegram falso |
 | `make revision m="…"` | nueva migración autogenerada |
 | `make nuke` | baja todo y borra los datos |
 

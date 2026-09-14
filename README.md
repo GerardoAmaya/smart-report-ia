@@ -6,10 +6,9 @@ cuadrilla lo ve agrupado con los otros tres que reportaron lo mismo.
 
 El alcance, las fases y las decisiones ya tomadas están en [`PLAN.md`](PLAN.md).
 
-**Estado: fase 6 — despacho y cierre.** El bot recibe foto y ubicación,
-guarda las fotos, propone categoría, la persona confirma, el código agrupa,
-y el tablero asigna cuadrillas, cierra con foto de evidencia y **avisa de
-vuelta a todos los que reportaron**.
+**Estado: fase 7 — tiempo real y pruebas extremo a extremo.** El tablero se
+actualiza solo, y los tres recorridos —reportar, agrupar y despachar,
+cerrar— se prueban contra el sistema levantado en cada commit.
 
 ---
 
@@ -52,6 +51,7 @@ deja sembrados los canales conocidos y se puede correr las veces que sea.
 | `make classifications` | cola de clasificación |
 | `make grouping` | casos y la evidencia de cada unión |
 | `make grouping-eval f=…` | las dos tasas de agrupación |
+| `make e2e` | los tres recorridos contra el sistema levantado |
 | `make health` | `/health` formateado |
 | `make nuke` | baja todo y borra los datos |
 
@@ -414,6 +414,57 @@ puedan comprobar.
 Quien no se pueda recibir el mensaje —bloqueó al bot, borró la conversación— se
 marca como fallo permanente al primer intento. Reintentar eso es gastar cuota
 para llegar a la misma conclusión.
+
+## El tablero se actualiza solo
+
+Sin recargar y sin sondear. Los cambios salen de `LISTEN/NOTIFY` de Postgres
+—el mismo sitio donde vive la cola, sin Redis ni bus de mensajes— y llegan al
+navegador por **Server-Sent Events**.
+
+SSE y no WebSocket porque esto solo va del servidor al navegador: el tablero
+escucha, no habla. SSE viaja sobre HTTP normal, atraviesa proxies sin configurar
+nada, y el navegador reconecta solo.
+
+**Se manda «algo cambió aquí», nunca la fila.** El cliente pide lo que necesite.
+Mandar el dato por el flujo obligaría a mantener dos formas de leer lo mismo, y
+la segunda se queda vieja.
+
+El aviso sale de un **disparador** y no de llamadas en el código. La tentación es
+avisar a mano en cada sitio que cambia algo, y es exactamente así como el tablero
+se queda viejo: basta olvidar uno.
+
+El indicador **En vivo** dice si el flujo está conectado. Un tablero que dejó de
+actualizarse y no lo dice es peor que uno que hay que recargar a mano: quien lo
+mira sigue creyendo lo que ve.
+
+## Pruebas extremo a extremo
+
+```bash
+make e2e
+```
+
+**Contra el sistema levantado, no contra simulaciones.** Una prueba que simula la
+API comprueba que el frontend se entiende consigo mismo, no que el sistema
+funciona.
+
+Los reportes entran por el webhook de verdad, con su secreto y su payload de
+Telegram. No hay endpoints de prueba ni escrituras directas a la base.
+
+Lo único sustituido es **a qué servidor le habla el bot**: un Telegram falso que
+sirve una foto y guarda los mensajes, para no necesitar una cuenta ni fotos
+reales en cada corrida. El código que corre es el mismo de producción, incluido
+el cliente de Telegram; lo que cambia es una variable de entorno.
+
+Los tres recorridos que pide `PLAN.md`:
+
+| | |
+|---|---|
+| **Reportar** | foto y ubicación por el bot → reporte con su foto guardada |
+| **Agrupar y despachar** | dos reportes cercanos se juntan, el tablero explica por qué, se asigna cuadrilla |
+| **Cerrar** | foto del arreglo, cierre, y aviso de vuelta a todos |
+
+Y uno más: que el tablero se actualice **sin recargar**. Esa prueba no llama a
+`page.reload()` en ningún momento — si hiciera falta recargar, fallaría.
 
 ## `/health`
 

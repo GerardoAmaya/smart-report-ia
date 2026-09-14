@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "copiar-worker": "node scripts/copiar-worker-maplibre.mjs",
     "predev": "npm run copiar-worker",
-    "prebuild": "npm run copiar-worker"
+    "prebuild": "npm run copiar-worker",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@tanstack/react-query": "5.102.8",
@@ -37,6 +39,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "4.3.3",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@playwright/test": "1.63.0"
   }
 }

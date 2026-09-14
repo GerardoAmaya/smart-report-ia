@@ -42,8 +42,9 @@ export function Cola({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["casos", filtro],
     queryFn: () => api.casos(filtro ? { status: filtro } : undefined),
-    // Los reportes entran solos: quien despacha no deberia recargar para verlos.
-    refetchInterval: 10_000,
+    // Sin sondeo: el flujo en vivo avisa cuando algo cambia. Pedir cada diez
+    // segundos sin que haya cambiado nada es gasto, y dos mecanismos que
+    // hacen lo mismo se contradicen el dia que uno falla.
   });
 
   return (

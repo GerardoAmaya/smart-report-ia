@@ -40,6 +40,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3100}
       ENVIRONMENT: ${ENVIRONMENT:-dev}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org/bot}
+      TELEGRAM_API_FILE_URL: ${TELEGRAM_API_FILE_URL:-https://api.telegram.org/file/bot}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
       S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
@@ -103,6 +105,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_report}:${POSTGRES_PASSWORD:-smart_report}@db:5432/${POSTGRES_DB:-smart_report}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org/bot}
+      TELEGRAM_API_FILE_URL: ${TELEGRAM_API_FILE_URL:-https://api.telegram.org/file/bot}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CLASSIFY_MODEL: ${CLASSIFY_MODEL:-claude-haiku-4-5}
       CLASSIFY_IMAGE_VARIANT: ${CLASSIFY_IMAGE_VARIANT:-thumbnail}
@@ -122,6 +126,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Telegram falso, solo para las pruebas extremo a extremo.
+  # `profiles` lo deja fuera de `make up`: solo arranca con `--profile e2e`, asi
+  # que nunca se levanta por accidente en desarrollo normal.
+  telegram-falso:
+    build: ./backend
+    command: python /e2e/telegram-falso.py 8099
+    volumes:
+      - ./frontend/e2e:/e2e
+      - ./backend:/app
+    ports:
+      - "8099:8099"
+    profiles: ["e2e"]
+
   web:
     build: ./frontend
     environment:
@@ -133,6 +150,10 @@ services:
     volumes:
       - ./frontend:/app
       - web_node_modules:/app/node_modules
+      # Los navegadores de Playwright pesan 115 MB y viven dentro del
+      # contenedor: sin volumen se pierden en cada recreacion y hay que
+      # bajarlos otra vez.
+      - playwright_cache:/root/.cache/ms-playwright
       - web_next:/app/.next
     depends_on:
       - api
@@ -140,5 +161,6 @@ services:
 volumes:
   pgdata:
   miniodata:
+  playwright_cache:
   web_node_modules:
   web_next:

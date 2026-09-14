@@ -224,15 +224,15 @@ def decidir(candidato: Candidato | None) -> tuple[str, str]:
     cual: "a 12 m del caso, misma categoria" se puede discutir; un 0,87 no.
     """
     if candidato is None:
-        return "alone", "No hay ningun caso abierto de la misma categoria cerca."
+        return "alone", "No hay ningún caso abierto de la misma categoría cerca."
 
     d = candidato.distance_m
     if d <= settings.group_max_distance_m:
-        motivo = f"A {d:.0f} m del caso, misma categoria."
+        motivo = f"A {d:.0f} m del caso, misma categoría."
         if candidato.visual_distance is not None and (
             candidato.visual_distance <= settings.same_image_max_bits
         ):
-            motivo += " Ademas la foto es la misma imagen."
+            motivo += " Además la foto es la misma imagen."
         elif candidato.text_similarity >= 0.5:
             motivo += f" El texto coincide en {candidato.text_similarity:.0%}."
         return "grouped", motivo
@@ -240,16 +240,16 @@ def decidir(candidato: Candidato | None) -> tuple[str, str]:
     # Entre los dos umbrales: ni se junta ni se descarta. Se equivoca hacia el
     # error molesto —dos casos que eran uno— y nunca hacia el grave.
     motivo = (
-        f"A {d:.0f} m de un caso de la misma categoria: demasiado lejos para "
-        f"juntarlos automaticamente (el limite son {settings.group_max_distance_m:.0f} m) "
-        f"y demasiado cerca para ignorarlo. Queda esperando revision."
+        f"A {d:.0f} m de un caso de la misma categoría: demasiado lejos para "
+        f"juntarlos automáticamente (el límite son {settings.group_max_distance_m:.0f} m) "
+        f"y demasiado cerca para ignorarlo. Queda esperando revisión."
     )
     if candidato.visual_distance is not None and (
         candidato.visual_distance <= settings.same_image_max_bits
     ):
         # La misma imagen a 60 m puede ser un reenvio con ubicacion propia, que
         # seria una agrupacion falsa de las graves. Se señala, no se junta.
-        motivo += " La foto es la misma imagen, lo que puede ser un reenvio."
+        motivo += " La foto es la misma imagen, lo que puede ser un reenvío."
     return "doubtful", motivo
 
 
@@ -285,7 +285,7 @@ def group_report(session: Session, reporte: Report) -> str:
                 hours_apart=otro.hours_apart,
                 text_similarity=otro.text_similarity,
                 visual_distance=otro.visual_distance,
-                reason=f"Habia otro caso a {otro.distance_m:.0f} m, mas lejos que el elegido.",
+                reason=f"Había otro caso a {otro.distance_m:.0f} m, más lejos que el elegido.",
                 thresholds=umbrales(),
             )
         )

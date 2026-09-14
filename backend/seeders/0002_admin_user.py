@@ -19,26 +19,27 @@ from app.permissions import Role
 
 
 def seed(session: Session) -> None:
-    correo = (settings.admin_email or "").strip().lower()
-    if not correo:
+    correos = settings.admin_emails
+    if not correos:
         print("  ADMIN_EMAIL sin definir: no se sembro ningun administrador.")
         return
 
-    usuario = session.execute(select(User).where(User.email == correo)).scalar_one_or_none()
+    for correo in correos:
+        usuario = session.execute(select(User).where(User.email == correo)).scalar_one_or_none()
 
-    if usuario is None:
-        session.add(
-            User(
-                email=correo,
-                role=Role.ADMIN.value,
-                display_name="Administrador",
-                is_active=True,
+        if usuario is None:
+            session.add(
+                User(
+                    email=correo,
+                    role=Role.ADMIN.value,
+                    display_name="Administrador",
+                    is_active=True,
+                )
             )
-        )
-        return
+            continue
 
-    # No se pisa el rol si ya existe: alguien pudo haberlo bajado a proposito, y
-    # un seeder que lo devuelve a admin en cada despliegue deshace esa decision
-    # sin avisar.
-    if not usuario.is_active:
-        print(f"  {correo} existe pero esta desactivado; no se reactiva solo.")
+        # No se pisa el rol si ya existe: alguien pudo haberlo bajado a
+        # proposito, y un seeder que lo devuelve a admin en cada despliegue
+        # deshace esa decision sin avisar.
+        if not usuario.is_active:
+            print(f"  {correo} existe pero esta desactivado; no se reactiva solo.")

@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     # --- Canal de Telegram ---
     telegram_bot_token: SecretStr = SecretStr("")
 
+    # A donde habla el bot. Se puede redirigir para probar el camino entero
+    # sin Telegram: las pruebas extremo a extremo levantan un Telegram falso
+    # y apuntan aqui. Sin esto, comprobar la descarga de una foto exigiria
+    # una cuenta y una foto de verdad en cada corrida de CI.
+    telegram_api_base_url: str = "https://api.telegram.org/bot"
+    telegram_api_file_url: str = "https://api.telegram.org/file/bot"
+
     # Telegram devuelve este valor en X-Telegram-Bot-Api-Secret-Token en cada
     # update. Sin el, cualquiera que descubra la URL inyecta reportes falsos.
     telegram_webhook_secret: SecretStr = SecretStr("")
@@ -148,8 +155,15 @@ class Settings(BaseSettings):
     demo_email: str = "demo@smart-report.local"
     demo_password: SecretStr = SecretStr("")
 
-    # Correo del primer administrador. Lo siembra el seeder.
+    # Correos de los administradores, separados por coma. Lo siembra el
+    # seeder. Varios porque una persona suele tener mas de una cuenta, y
+    # quedarse fuera del tablero por entrar con la otra es una forma tonta
+    # de perder el acceso.
     admin_email: str = ""
+
+    @property
+    def admin_emails(self) -> list[str]:
+        return [c.strip().lower() for c in self.admin_email.split(",") if c.strip()]
 
     environment: str = "dev"
     cors_origins: str = "http://localhost:3100"

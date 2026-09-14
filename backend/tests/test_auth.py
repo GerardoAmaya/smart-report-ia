@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 
 from app import auth
 from app.config import settings
+from app.main import app
 from app.models import Case, Report, User
 from app.permissions import Permission, Role, puede
 
@@ -58,20 +59,26 @@ def entrar_de_prueba(client) -> None:
     assert r.status_code == 200, r.text
 
 
-def entrar_como(client, session, usuario: User) -> None:
-    """Abre sesion sin pasar por Google, que no se puede en una prueba."""
-    with client as c:
-        c.post("/auth/demo", json={"password": PASSWORD})
-    # Se reemplaza el correo de la sesion por el del usuario pedido.
-    client.cookies.clear()
-    import base64
-    import json as _json
+def entrar_como(usuario: User):
+    """Abre sesion como un usuario cualquiera, **sin falsificar la cookie**.
 
-    from itsdangerous import TimestampSigner
+    La version anterior firmaba la cookie a mano reconstruyendo el esquema de
+    `SessionMiddleware`. Duplicar los internos de la libreria que se prueba es
+    fragil por definicion: paso local —donde SESSION_SECRET esta en el .env— y
+    fallo en CI —donde la app genera una al vuelo y la prueba firmaba con otra—.
 
-    firmante = TimestampSigner(str(settings.session_secret.get_secret_value() or "x"))
-    datos = base64.b64encode(_json.dumps({auth.CLAVE_DE_SESION: usuario.email}).encode())
-    client.cookies.set("session", firmante.sign(datos).decode())
+    Se sustituye la dependencia, que es la costura que FastAPI ofrece para esto.
+    Las pruebas que comprueban `current_user` en si no usan esto: usan una
+    sesion de verdad.
+    """
+    app.dependency_overrides[auth.current_user] = lambda: usuario
+
+
+@pytest.fixture(autouse=True)
+def limpiar_dependencias():
+    """Sin esto, una sustitucion se filtra a la siguiente prueba."""
+    yield
+    app.dependency_overrides.clear()
 
 
 # --- LO QUE DEFINE LA FASE ---
@@ -116,7 +123,7 @@ def test_el_usuario_de_prueba_si_puede_separar(client, session, caso):
 
 
 def test_el_administrador_si_puede_borrar(client, session, admin, caso):
-    entrar_como(client, session, admin)
+    entrar_como(admin)
 
     r = client.delete(f"/board/cases/{caso.id}")
 
@@ -185,16 +192,19 @@ def test_el_correo_se_compara_en_minusculas(session, admin):
     assert auth.autorizado(session, "  JEFA@Ejemplo.SV  ") is not None
 
 
-def test_quitar_el_acceso_corta_la_sesion_en_la_siguiente_peticion(client, session, admin, caso):
+def test_quitar_el_acceso_corta_la_sesion_en_la_siguiente_peticion(client, session):
     """No se espera a que expire la cookie.
 
     Si a alguien se le quita el acceso, deja de poder ahora y no doce horas
-    despues.
+    despues. Con **sesion de verdad**, no sustituyendo la dependencia: lo que se
+    comprueba es justo que `current_user` vuelva a mirar la base en cada
+    peticion, y sustituirla lo saltaria.
     """
-    entrar_como(client, session, admin)
+    entrar_de_prueba(client)
     assert client.get("/board/cases").status_code == 200
 
-    admin.is_active = False
+    demo = session.execute(select(User).where(User.email == settings.demo_email)).scalar_one()
+    demo.is_active = False
     session.commit()
 
     assert client.get("/board/cases").status_code == 403

@@ -114,7 +114,9 @@ def perceptual_hash(data: bytes) -> int:
         img = ImageOps.exif_transpose(img).convert("L")
         # Ancho+1 para poder comparar cada pixel con el de su derecha.
         img = img.resize((HASH_LADO + 1, HASH_LADO), Image.LANCZOS)
-        pixeles = list(img.getdata())
+        # get_flattened_data y no getdata: este ultimo esta deprecado y se
+        # va en Pillow 14 (octubre de 2027). Devuelven lo mismo.
+        pixeles = list(img.get_flattened_data())
 
     bits = 0
     for fila in range(HASH_LADO):

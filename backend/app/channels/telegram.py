@@ -209,6 +209,34 @@ class TelegramChannel:
         async with bot:
             await bot.send_message(chat_id=external_user_id, text=text)
 
+    async def edit_out_of_band(
+        self, external_user_id: str, message_id: str, text: str, options: list[tuple[str, str]]
+    ) -> None:
+        """Reescribe el mensaje de los botones, fuera del webhook.
+
+        El cuerpo del webhook solo admite **una** llamada, y ahi va siempre
+        `answerCallbackQuery`: es lo unico que apaga el reloj del boton, y un
+        boton que gira es lo que la persona lee como "no funciono". La reescritura
+        —que es lo que se ve— llega un instante despues por `BackgroundTasks`,
+        ya fuera del segundo que Telegram cronometra.
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+        bot = self._bot()
+        async with bot:
+            await bot.edit_message_text(
+                chat_id=external_user_id,
+                message_id=int(message_id),
+                text=text,
+                reply_markup=(
+                    InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(e, callback_data=v)] for e, v in options]
+                    )
+                    if options
+                    else None
+                ),
+            )
+
     async def ask_out_of_band(
         self, external_user_id: str, text: str, options: list[tuple[str, str]]
     ) -> None:

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app import ingest
@@ -34,6 +34,7 @@ SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 def telegram_webhook(
     request: Request,
     response: Response,
+    background: BackgroundTasks,
     payload: Annotated[dict, Body()],
     session: Annotated[Session, Depends(get_session)],
 ) -> dict:
@@ -129,23 +130,31 @@ def telegram_webhook(
     log.info("update %s procesado: %s", update_id, mensaje.kind)
 
     if respuesta.choice_id:
-        # Una eleccion se contesta entera dentro de esta misma respuesta HTTP.
-        # Antes se mandaba un mensaje aparte desde BackgroundTasks, que es una
-        # llamada de red saliente: rompia la regla de la fase 1 y se notaba en
-        # el boton, que giraba segundos antes de resolverse.
-        if respuesta.edit_message_id:
-            # Se edita tambien cuando no quedan opciones. Antes ese caso
-            # contestaba con `answerCallbackQuery`, que Telegram pinta como un
-            # aviso de un segundo: confirmar —el camino correcto— parecia no
-            # hacer nada, mientras corregir reescribia el mensaje y si se veia.
-            # Reportado desde un telefono real: "dos veces le di, y no paso de
-            # ahi". Habia pasado las dos veces.
-            return canal.edit_with_options(
+        # El reparto importa y costo dos intentos. El cuerpo del webhook admite
+        # **una** sola llamada:
+        #
+        #   - Solo `answerCallbackQuery`: el boton se apaga al instante, pero el
+        #     mensaje se queda igual. Confirmar —el camino normal— parecia no
+        #     hacer nada. Reportado desde un telefono: "le di dos veces y no
+        #     paso de ahi". Habia pasado las dos veces.
+        #   - Solo `editMessageText`: el mensaje si cambia, pero nadie apaga el
+        #     reloj del boton y se queda girando. Tambien reportado: "se me
+        #     quedo cargando".
+        #
+        # Asi que va lo urgente en el cuerpo y lo visible justo detras: apagar
+        # el reloj es lo unico que Telegram cronometra dentro del segundo, y la
+        # reescritura sale por `BackgroundTasks`, ya fuera del handler.
+        if respuesta.replace_message and respuesta.edit_message_id:
+            background.add_task(
+                canal.edit_out_of_band,
                 mensaje.external_user_id,
                 respuesta.edit_message_id,
                 respuesta.text,
                 respuesta.options,
             )
+            return canal.ack_choice(respuesta.choice_id)
+        # Un aviso ("ya estaba confirmado", "no encuentro eso") no reescribe
+        # nada: borraria la propuesta que sigue esperando respuesta.
         return canal.ack_choice(respuesta.choice_id, respuesta.text)
 
     if respuesta.options:

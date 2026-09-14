@@ -18,6 +18,8 @@ from tests.conftest import SECRETO_DE_PRUEBA
 from tests.factories import update_con_boton
 
 URL = "/webhooks/telegram"
+# Lo que el webhook mando reescribir, recogido por el fixture `sin_red`.
+ediciones: list[dict] = []
 CAB = {SECRET_HEADER: SECRETO_DE_PRUEBA}
 USUARIO = 4242
 
@@ -37,6 +39,22 @@ def sin_red(monkeypatch):
     monkeypatch.setattr(TelegramChannel, "notify", prohibido)
     monkeypatch.setattr(TelegramChannel, "ask_out_of_band", prohibido)
     monkeypatch.setattr(TelegramChannel, "fetch_media", prohibido)
+
+    # La reescritura si sale a la red, pero **despues** de responder y por
+    # BackgroundTasks. Se recoge para poder comprobar que se pidio.
+    ediciones.clear()
+
+    async def anotar(self, external_user_id, message_id, text, options):
+        ediciones.append(
+            {
+                "chat_id": external_user_id,
+                "message_id": message_id,
+                "text": text,
+                "options": options,
+            }
+        )
+
+    monkeypatch.setattr(TelegramChannel, "edit_out_of_band", anotar)
 
 
 @pytest.fixture
@@ -65,9 +83,8 @@ def test_confirmar_deja_la_categoria_propuesta(client, session, propuesta):
     r = post(client, update_con_boton(data=f"s:{propuesta.id}"))
 
     assert r.status_code == 200
-    # Se contesta dentro de la misma respuesta HTTP, sin mandar nada aparte.
-    cuerpo = r.json()
-    assert cuerpo["method"] == "editMessageText"
+    # En el cuerpo va lo unico que apaga el reloj del boton.
+    assert r.json()["method"] == "answerCallbackQuery"
 
     session.refresh(propuesta)
     assert propuesta.status == "confirmed"
@@ -85,15 +102,20 @@ def test_confirmar_se_ve_en_el_chat(client, session, propuesta):
     funcionado.
     """
     r = post(client, update_con_boton(data=f"s:{propuesta.id}", message_id=900))
-    cuerpo = r.json()
 
-    assert cuerpo["method"] == "editMessageText"
-    assert cuerpo["message_id"] == 900
+    # El reloj del boton se apaga en el cuerpo, que es lo que Telegram
+    # cronometra; sin esto el boton gira y se lee como "no funciono".
+    assert r.json()["method"] == "answerCallbackQuery"
+
+    # Y el mensaje se reescribe, que es lo que la persona ve.
+    assert len(ediciones) == 1
+    edicion = ediciones[0]
+    assert edicion["message_id"] == "900"
     # El texto reemplaza a la propuesta, asi que tiene que repetir que se
     # confirmo: si solo dijera "gracias", el chat perderia el dato.
-    assert "Calle o acera" in cuerpo["text"]
+    assert "Calle o acera" in edicion["text"]
     # Sin botones: ya no hay nada que elegir.
-    assert "reply_markup" not in cuerpo
+    assert not edicion["options"]
 
 
 def test_corregir_muestra_las_categorias(client, session, propuesta):
@@ -102,9 +124,10 @@ def test_corregir_muestra_las_categorias(client, session, propuesta):
 
     # Edita el mensaje en el sitio: no acumula preguntas viejas con botones
     # que ya no valen.
-    assert cuerpo["method"] == "editMessageText"
-    assert cuerpo["message_id"] == 901
-    etiquetas = [b[0]["text"] for b in cuerpo["reply_markup"]["inline_keyboard"]]
+    assert cuerpo["method"] == "answerCallbackQuery"
+    assert len(ediciones) == 1
+    assert ediciones[0]["message_id"] == "901"
+    etiquetas = [e for e, _ in ediciones[0]["options"]]
     assert "Alumbrado" in etiquetas
     assert len(etiquetas) == len(Category)
 
@@ -119,11 +142,10 @@ def test_elegir_otra_categoria_la_marca_corregida(client, session, propuesta):
     indice = categorias_reales().index(Category.AGUA)
     r = post(client, update_con_boton(data=f"c:{propuesta.id}:{indice}"))
 
-    cuerpo = r.json()
-    assert cuerpo["method"] == "editMessageText"
+    assert r.json()["method"] == "answerCallbackQuery"
     # Nombra la categoria elegida, no la que se habia propuesto.
-    assert "Agua o drenaje" in cuerpo["text"]
-    assert "reply_markup" not in cuerpo
+    assert "Agua o drenaje" in ediciones[0]["text"]
+    assert not ediciones[0]["options"]
 
     session.refresh(propuesta)
     assert propuesta.status == "corrected"

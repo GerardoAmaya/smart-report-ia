@@ -38,6 +38,7 @@ LISTO = (
     "cercano."
 )
 DETALLE_GUARDADO = "Anotado, gracias."
+YA_ESTA = "Ese reporte ya quedo listo. Si querés reportar otra cosa, mandame una foto."
 DETALLE_Y_FALTA_UBICACION = "Anotado. Todavia me falta la ubicacion."
 SIN_FOTO = "Primero mandame la foto del problema, y despues la ubicacion."
 NO_ENTIENDO = "Solo puedo recibir fotos y ubicaciones."
@@ -56,6 +57,8 @@ class Reply:
     choice_id: str | None = None
     # Mensaje a reemplazar, cuando la respuesta son otras opciones.
     edit_message_id: str | None = None
+    # Si el texto reemplaza al mensaje de los botones o sale como aviso.
+    replace_message: bool = False
 
 
 def record_raw(
@@ -259,11 +262,33 @@ def _handle_text(session: Session, message: InboundMessage) -> Reply:
     if reporte is None:
         return Reply(PEDIR_FOTO)
 
+    # Confirmada la categoria, la conversacion de ese reporte se acabo. Seguir
+    # pegando texto convierte un "Hola" en parte de la evidencia que lee la
+    # cuadrilla, y peor: contesta "Anotado, gracias" a un saludo, que es
+    # exactamente lo que hace pensar que el bot no entiende nada.
+    if _ya_confirmado(session, reporte):
+        return Reply(YA_ESTA)
+
     append_caption(reporte, texto)
 
     if reporte.status == "incomplete":
         return Reply(DETALLE_Y_FALTA_UBICACION, ask_location=True)
     return Reply(DETALLE_GUARDADO)
+
+
+def _ya_confirmado(session: Session, reporte: Report) -> bool:
+    """Si una persona ya confirmo o corrigio la categoria de este reporte."""
+    from app.models import Classification
+
+    return (
+        session.execute(
+            select(Classification.id).where(
+                Classification.report_id == reporte.id,
+                Classification.confirmed_at.is_not(None),
+            )
+        ).first()
+        is not None
+    )
 
 
 def _handle_choice(session: Session, message: InboundMessage) -> Reply:
@@ -273,10 +298,13 @@ def _handle_choice(session: Session, message: InboundMessage) -> Reply:
     if not message.choice:
         return Reply(NO_ENTIENDO)
 
-    texto, opciones = confirm.handle_choice(session, message.external_user_id, message.choice)
+    texto, opciones, reemplaza = confirm.handle_choice(
+        session, message.external_user_id, message.choice
+    )
     return Reply(
         texto,
         options=opciones or None,
         choice_id=message.choice_id,
         edit_message_id=message.choice_message_id,
+        replace_message=reemplaza,
     )

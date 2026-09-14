@@ -109,42 +109,53 @@ def _buscar(session: Session, cid: str, external_user_id: str) -> Classification
     ).scalar_one_or_none()
 
 
-def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[str, list]:
-    """Aplica la eleccion. Devuelve el texto de respuesta y botones nuevos."""
+def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[str, list, bool]:
+    """Aplica la eleccion.
+
+    Devuelve el texto, los botones nuevos, y **si ese texto reemplaza al
+    mensaje**. Lo tercero no es un detalle de presentacion: reescribir con
+    "no encuentro ese reporte" borraria del chat la propuesta que la persona
+    todavia tiene que contestar. Los avisos salen como aviso; solo lo que
+    cierra la pregunta la reemplaza.
+    """
     if valor.startswith(PREFIJO_SI):
         clasificacion = _buscar(session, valor[len(PREFIJO_SI) :], external_user_id)
         if clasificacion is None:
-            return NO_ENCONTRADO, []
+            return NO_ENCONTRADO, [], False
         if clasificacion.confirmed_at is not None:
-            return YA_CONFIRMADO, []
+            return YA_CONFIRMADO, [], False
 
         clasificacion.final_category = clasificacion.proposed_category
         clasificacion.final_severity = clasificacion.proposed_severity
         clasificacion.status = "confirmed"
         clasificacion.confirmed_at = datetime.now(UTC)
         _agrupar(session, clasificacion)
-        return _resumen(clasificacion, "Confirmado, gracias.", clasificacion.final_category), []
+        return (
+            _resumen(clasificacion, "Confirmado, gracias.", clasificacion.final_category),
+            [],
+            True,
+        )
 
     if valor.startswith(PREFIJO_NO):
         clasificacion = _buscar(session, valor[len(PREFIJO_NO) :], external_user_id)
         if clasificacion is None:
-            return NO_ENCONTRADO, []
+            return NO_ENCONTRADO, [], False
         texto, opciones = opciones_de_categoria(clasificacion)
-        return texto, opciones
+        return texto, opciones, True
 
     if valor.startswith(PREFIJO_CATEGORIA):
         resto = valor[len(PREFIJO_CATEGORIA) :]
         cid, _, indice = resto.rpartition(":")
         clasificacion = _buscar(session, cid, external_user_id)
         if clasificacion is None:
-            return NO_ENCONTRADO, []
+            return NO_ENCONTRADO, [], False
 
         if indice == "x":
             categoria = Category.NO_ES_REPORTE
         else:
             reales = categorias_reales()
             if not indice.isdigit() or int(indice) >= len(reales):
-                return NO_ENCONTRADO, []
+                return NO_ENCONTRADO, [], False
             categoria = reales[int(indice)]
 
         clasificacion.final_category = categoria.value
@@ -154,13 +165,17 @@ def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[
         clasificacion.status = "corrected"
         clasificacion.confirmed_at = datetime.now(UTC)
         _agrupar(session, clasificacion)
-        return _resumen(
-            clasificacion,
-            "Corregido, gracias. Eso ayuda a que el sistema mejore.",
-            clasificacion.final_category,
-        ), []
+        return (
+            _resumen(
+                clasificacion,
+                "Corregido, gracias. Eso ayuda a que el sistema mejore.",
+                clasificacion.final_category,
+            ),
+            [],
+            True,
+        )
 
-    return NO_ENCONTRADO, []
+    return NO_ENCONTRADO, [], False
 
 
 def _agrupar(session: Session, clasificacion: Classification) -> None:

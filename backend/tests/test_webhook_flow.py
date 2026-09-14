@@ -179,6 +179,45 @@ def test_texto_despues_de_completar_se_pega_al_reporte(client, session):
     assert "hueco enorme frente al colegio" in fila.caption
 
 
+def test_texto_despues_de_confirmar_no_se_pega(client, session):
+    """El bug: un saludo acababa dentro de la evidencia.
+
+    Con la categoria ya confirmada, la conversacion de ese reporte se acabo.
+    Seguir pegando texto contestaba "Anotado, gracias." a un "Hola" —que es
+    justo lo que hace pensar que el bot no entiende— y metia el saludo en lo
+    que lee la cuadrilla.
+    """
+    from datetime import UTC, datetime
+
+    from app.models import Classification
+    from app.taxonomy import Category
+
+    post(client, update_con_foto(update_id=1))
+    post(client, update_con_ubicacion(update_id=2))
+
+    reporte_id = session.execute(text("SELECT id FROM reports")).scalar()
+    session.add(
+        Classification(
+            report_id=reporte_id,
+            status="confirmed",
+            proposed_category=Category.VIALIDAD.value,
+            proposed_severity="media",
+            proposed_reason="Un bache.",
+            final_category=Category.VIALIDAD.value,
+            final_severity="media",
+            model="claude-haiku-4-5",
+            confirmed_at=datetime.now(UTC),
+        )
+    )
+    session.commit()
+
+    r = post(client, update_con_texto(update_id=3, texto="Hola"))
+
+    assert r.json()["text"] == ingest.YA_ESTA
+    caption = session.execute(text("SELECT caption FROM reports")).scalar()
+    assert "Hola" not in (caption or "")
+
+
 def test_texto_con_reporte_incompleto_anota_y_sigue_pidiendo_ubicacion(client, session):
     post(client, update_con_foto(update_id=1, caption=None))
     r = post(client, update_con_texto(update_id=2, texto="se inunda cuando llueve"))

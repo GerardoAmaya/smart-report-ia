@@ -340,13 +340,29 @@ comportamiento correcto— y afirmar cuántos hay en un caso se vuelve imposible
 comentarios del código pueden ir sin ellas; la evidencia que se muestra en el
 tablero no. Hay una prueba que lo fija.
 
-**Una eleccion se contesta reescribiendo el mensaje, no con un aviso.**
-`answerCallbackQuery` pinta un globo de un segundo sobre el chat. Confirmar
-—el camino normal— contestaba asi y parecia no hacer nada, mientras corregir
-—el camino raro— reescribia el mensaje y si se veia. Alguien probo desde su
-telefono, le dio dos veces a «Si, es correcto», y las dos veces habia
-funcionado. El texto nuevo repite la categoria porque **reemplaza** a la
-propuesta: si solo dijera «gracias», el chat perderia lo unico que se confirmo.
+**Una eleccion se contesta con las dos cosas: el aviso en el cuerpo y la
+reescritura detras.** El cuerpo del webhook admite una sola llamada, y ninguna
+de las dos sola alcanza. Solo `answerCallbackQuery`: el boton se apaga pero el
+mensaje no cambia, y confirmar —el camino normal— parece no hacer nada
+(«le di dos veces y no paso de ahi»; habia pasado las dos veces). Solo
+`editMessageText`: el mensaje cambia pero nadie apaga el reloj del boton, que
+se queda girando («se me quedo cargando»). Las dos se reportaron desde un
+telefono real, una tras otra. Va en el cuerpo lo que Telegram cronometra
+—apagar el reloj— y la reescritura por `BackgroundTasks`, ya fuera del handler.
+El texto nuevo repite la categoria porque **reemplaza** a la propuesta: si solo
+dijera «gracias», el chat perderia lo unico que se confirmo.
+
+**Un aviso no reescribe el mensaje.** «No encuentro ese reporte» y «ya estaba
+confirmado» salen como aviso emergente. Reescribir con ellos borraria del chat
+la propuesta que todavia espera respuesta, cambiando un tropiezo por una
+perdida.
+
+**Con la categoria confirmada, el texto suelto ya no se pega al reporte.** Se
+pegaba: un «Hola» acababa dentro de la evidencia que lee la cuadrilla, y el bot
+contestaba «Anotado, gracias» a un saludo —que es justo lo que hace pensar que
+no entiende nada—. Antes de confirmar el texto sigue siendo descripcion y se
+guarda; despues, la conversacion de ese reporte se acabo y un texto nuevo
+empieza otro.
 
 **La propuesta llega despues de pedir la ubicacion, no antes.** Se considero
 mostrarla en cuanto llega la foto, que se lee mejor. Medido: diez segundos

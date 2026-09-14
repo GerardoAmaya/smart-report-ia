@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* La paleta sale del material del problema: asfalto, senalizacion, cono de obra. */
+@theme {
+  --color-fondo: #eeefec;
+  --color-tinta: #16181a;
+  --color-verde: #1f6f5c;
+  --color-ambar: #c77b23;
+  --color-rojo: #b4442e;
+  --color-gris: #7a8288;
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+}
+
+/* Piso de calidad: el foco de teclado se ve siempre. */
+:focus-visible {
+  outline: 2px solid var(--color-verde);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

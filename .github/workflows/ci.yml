@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: smart_report
+          POSTGRES_PASSWORD: smart_report
+          POSTGRES_DB: smart_report
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U smart_report"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+
+    env:
+      DATABASE_URL: postgresql+psycopg://smart_report:smart_report@localhost:5432/smart_report
+      ENVIRONMENT: ci
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - run: pip install -e ".[dev]"
+
+      - run: ruff check .
+      - run: ruff format --check .
+
+      - name: Migraciones en ambas direcciones
+        # Una migracion que sube pero no baja se descubre el dia que hay que
+        # revertir en produccion. Se comprueba en cada commit.
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+      - run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build

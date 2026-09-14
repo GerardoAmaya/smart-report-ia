@@ -1,0 +1,38 @@
+[project]
+name = "smart-report-api"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]==0.141.1",
+    "uvicorn[standard]==0.52.4",
+    "sqlalchemy==2.0.52",
+    "alembic==1.20.0",
+    "psycopg[binary]==3.3.5",
+    "geoalchemy2==0.20.0",
+    "pydantic-settings==2.15.0",
+    "anthropic==1.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "httpx==0.28.1",
+    "ruff==0.16.7",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint.isort]
+# La carpeta local alembic/ hace que ruff crea que el paquete es propio.
+known-third-party = ["alembic"]

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Para lanzar a mano las pruebas extremo a extremo, que no corren solas.
+  workflow_dispatch:
 
 jobs:
   backend:
@@ -118,6 +120,15 @@ jobs:
       - run: npm run build
 
   e2e:
+    # **No corre en cada commit: se lanza a mano.**
+    #
+    # La clasificacion es parte del camino que se prueba, asi que cada corrida
+    # llama al modelo de verdad. Son centavos, pero centavos en cada empujon a
+    # una rama, y este es un proyecto con saldo contado. Se lanza desde la
+    # pestaña Actions cuando se quiera comprobar el sistema entero, y en local
+    # con `make e2e` sin pedirle permiso a nadie.
+    if: github.event_name == 'workflow_dispatch'
+
     # Extremo a extremo **contra el sistema levantado**, no contra
     # simulaciones. Es lo que PLAN.md exige para dar la fase 7 por terminada:
     # una prueba que simula la API comprueba que el frontend se entiende

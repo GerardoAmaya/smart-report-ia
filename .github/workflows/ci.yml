@@ -50,6 +50,13 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
+      - name: Seeders
+        # Idempotentes por contrato: correrlos dos veces tiene que dejar lo
+        # mismo. Si eso se rompe, se descubre aca y no en un despliegue.
+        run: |
+          python -m seeders.runner
+          python -m seeders.runner
+
       - run: pytest -q
 
   frontend:

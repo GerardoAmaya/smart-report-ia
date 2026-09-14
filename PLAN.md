@@ -93,14 +93,26 @@ arranque, volver a consultarlas: este archivo envejece.
 | Driver | psycopg | 3.3 |
 | Modelo | Claude (SDK `anthropic`) | 1.5 |
 | Bot | python-telegram-bot | 22.8 |
+| Almacenamiento de objetos | MinIO local / Cloudflare R2 | S3 API |
 | Unitarias | pytest + Vitest | 9.1 / 5.0 |
 | Extremo a extremo | Playwright | 1.63 |
-| Linters | ruff + ESLint | 0.16 / 10.10 |
+| Linters | ruff + ESLint | 0.16 / 9.39 (ver la nota) |
 
 **TypeScript 7 es el compilador reescrito en Go.** Es un cambio de motor y
 acaba de salir; `typescript-eslint` y los plugins de editor pueden ir detrás.
 Se arranca en 7 **comprobando el primer día** que linter y editor funcionan,
 con 5.9 como retirada. «Última estable» y «seguro» no son lo mismo.
+
+**ESLint queda en 9 y no en 10.** `eslint-config-next` arrastra
+`eslint-plugin-react`, que declara techo `eslint ^9.7`. Con ESLint 10 el
+linter no marca errores: revienta con un `TypeError`, que es peor porque
+parece otra cosa. Cuando suban el techo, migrar es cambiar el número.
+
+**El almacenamiento se elige por egreso, no por espacio.** Diez gigas son
+unas cuarenta mil fotos de Telegram; el espacio no es la restricción que
+aprieta. El tablero sirve las mismas fotos ocho horas al día, y eso sí.
+R2 no cobra egreso. El vendedor es una variable de entorno: lo que no es
+reversible es hablar S3, y eso se decide desde la fase 1.
 
 **MapLibre y no Leaflet.** El tablero tiene que dibujar cientos de casos con
 agrupamiento y cambios en vivo. Leaflet es raster y se queda corto ahí;
@@ -159,8 +171,10 @@ verde, y `/health` reporta el estado real y no un `ok` fijo.
 ### Fase 1 — El canal
 
 Bot de Telegram recibiendo foto y ubicación, guardando el reporte crudo. **El
-canal es un adaptador desde ahora**, no después: una interfaz `CanalEntrada`
+canal es un adaptador desde ahora**, no después: una interfaz `InboundChannel`
 con Telegram como primera implementación.
+
+El nombre va en inglés como todo identificador del proyecto; ver CLAUDE.md.
 
 La ubicación se pide con el botón nativo de Telegram y no se saca de la foto:
 Telegram comprime las imágenes y les quita los metadatos.

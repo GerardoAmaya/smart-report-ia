@@ -65,3 +65,38 @@ def test_model_probe_is_cached(monkeypatch):
     assert health.check_model(now=100.0)["cached"] is False
     assert health.check_model(now=110.0)["cached"] is True
     assert len(calls) == 1
+
+
+def test_head_revision_no_depende_del_directorio(monkeypatch, tmp_path):
+    """El primer bug del proyecto, ahora con prueba.
+
+    `script_location` en alembic.ini es relativo al directorio de trabajo, que
+    bajo uvicorn no es el mismo que al correr alembic a mano. Si vuelve a
+    resolverse relativo, esta prueba falla desde /tmp y pasa desde /app, que
+    es exactamente como se escondia antes.
+    """
+    esperado = health.head_revision()
+    assert esperado is not None
+
+    monkeypatch.chdir(tmp_path)
+    assert health.head_revision() == esperado
+
+
+def test_detalle_de_error_se_enmascara_en_produccion(monkeypatch):
+    """En produccion el detalle no puede nombrar la infraestructura.
+
+    Un OperationalError de psycopg trae host, puerto y usuario de la base, y
+    /health se consulta sin autenticar.
+    """
+    from app.config import settings
+
+    excepcion = RuntimeError('connection to server at "db" port 5432 failed: user "smart_report"')
+
+    monkeypatch.setattr(settings, "environment", "dev")
+    assert "smart_report" in health.safe_detail(excepcion)
+
+    monkeypatch.setattr(settings, "environment", "production")
+    enmascarado = health.safe_detail(excepcion)
+    assert enmascarado == "RuntimeError"
+    assert "smart_report" not in enmascarado
+    assert "5432" not in enmascarado

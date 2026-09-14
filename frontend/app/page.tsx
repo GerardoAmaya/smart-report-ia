@@ -31,12 +31,17 @@ export default function Page() {
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch(`${API_URL}/health`, { cache: "no-store" });
-      setHealth((await response.json()) as Health);
+      const response = await fetch(`${API_URL}/health`, { cache: "no-store", signal });
+      const body = (await response.json()) as Health;
+      if (signal?.aborted) return;
+      setHealth(body);
       setError(null);
     } catch {
+      // Abortar al desmontar no es un fallo del servicio: sin esta guarda, el
+      // panel escribiria "sin respuesta" justo al salir de la pagina.
+      if (signal?.aborted) return;
       // La API caida no es lo mismo que la API degradada, y se dice distinto.
       setHealth(null);
       setError(`Sin respuesta de ${API_URL}`);
@@ -44,9 +49,17 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, 10_000);
-    return () => clearInterval(timer);
+    const controller = new AbortController();
+    // Sondear un sistema externo es justo para lo que sirve un efecto. La regla
+    // no distingue que load es asincrono y que el setState ocurre despues del
+    // await, no en el cuerpo del efecto.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(controller.signal);
+    const timer = setInterval(() => load(controller.signal), 10_000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
   }, [load]);
 
   return (

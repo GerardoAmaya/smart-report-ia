@@ -23,6 +23,19 @@ ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 
 Check = dict[str, Any]
 
+
+def safe_detail(exc: Exception) -> str:
+    """Detalle de error apto para devolver al cliente.
+
+    En dev sirve el mensaje entero. En produccion no: un OperationalError
+    de psycopg nombra host, puerto y usuario de la base, y /health se
+    consulta sin autenticar. Queda el tipo, que basta para saber que fallo.
+    """
+    if settings.is_production:
+        return type(exc).__name__
+    return f"{type(exc).__name__}: {exc}"
+
+
 # Cache del sondeo al modelo: (momento, resultado).
 _model_probe_cache: tuple[float, Check] | None = None
 
@@ -37,6 +50,7 @@ def head_revision() -> str | None:
     config.set_main_option("script_location", str(ALEMBIC_INI.parent / "alembic"))
     return ScriptDirectory.from_config(config).get_current_head()
 
+
 def check_database(engine: Engine) -> dict[str, Check]:
     """PostGIS y revision de esquema en una sola conexion."""
     head = head_revision()
@@ -47,7 +61,7 @@ def check_database(engine: Engine) -> dict[str, Check]:
             ).scalar()
             applied = MigrationContext.configure(conn).get_current_revision()
     except Exception as exc:
-        detail = f"{type(exc).__name__}: {exc}"
+        detail = safe_detail(exc)
         return {
             "postgis": {"ok": False, "detail": detail},
             "schema": {"ok": False, "detail": detail, "expected_revision": head},
@@ -72,19 +86,19 @@ def check_database(engine: Engine) -> dict[str, Check]:
 
 def _probe_model() -> Check:
     """Llamada minima a la API. No genera tokens: solo lista modelos."""
-    if not settings.anthropic_api_key:
+    if not settings.anthropic_api_key.get_secret_value():
         return {"ok": False, "detail": "ANTHROPIC_API_KEY sin definir"}
     try:
         from anthropic import Anthropic
 
         client = Anthropic(
-            api_key=settings.anthropic_api_key,
+            api_key=settings.anthropic_api_key.get_secret_value(),
             timeout=settings.model_probe_timeout_seconds,
             max_retries=0,
         )
         client.models.list(limit=1)
     except Exception as exc:
-        return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
+        return {"ok": False, "detail": safe_detail(exc)}
     return {"ok": True, "detail": None}
 
 

@@ -27,6 +27,13 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CORS_ORIGINS: http://localhost:3100
       ENVIRONMENT: ${ENVIRONMENT:-dev}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      S3_BUCKET: ${S3_BUCKET:-smart-report-photos}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-smart_report_minio}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-smart_report_minio_dev_only}
+      S3_REGION: ${S3_REGION:-us-east-1}
       RELOAD: "1"
     ports:
       - "8000:8000"
@@ -35,6 +42,44 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # Almacenamiento de objetos local. Habla el protocolo de S3, igual que R2 al
+  # desplegar: el codigo no distingue, solo cambian las variables de entorno.
+  # Nada lo escribe todavia; el trabajador que sube las fotos es de la fase 2.
+  minio:
+    # MinIO retiro sus imagenes de Docker Hub: solo estan en quay.io.
+    # Version clavada y no latest: una imagen que cambia sola convierte
+    # "a mi me funciona" en una afirmacion sin fecha.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-smart_report_minio}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-smart_report_minio_dev_only}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # El bucket tiene que existir antes de la primera subida. Crearlo aca y no
+  # en el arranque de la API evita que cada despliegue pida permiso de crear
+  # buckets, que en R2 no queremos dar.
+  minio_init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 '${S3_ACCESS_KEY_ID:-smart_report_minio}' '${S3_SECRET_ACCESS_KEY:-smart_report_minio_dev_only}' &&
+      mc mb --ignore-existing local/${S3_BUCKET:-smart-report-photos} &&
+      mc anonymous set none local/${S3_BUCKET:-smart-report-photos}
+      "
 
   web:
     build: ./frontend
@@ -53,5 +98,6 @@ services:
 
 volumes:
   pgdata:
+  miniodata:
   web_node_modules:
   web_next:

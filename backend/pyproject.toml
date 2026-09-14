@@ -11,12 +11,16 @@ dependencies = [
     "geoalchemy2==0.20.0",
     "pydantic-settings==2.15.0",
     "anthropic==1.5.0",
+    # PTB se usa como biblioteca, no como framework: los tipos del esquema de
+    # Telegram y nada mas. El enrutado ya lo hace FastAPI.
+    "python-telegram-bot==22.8",
+    # Deja de ser solo de pruebas: PTB lo exige en runtime (>=0.27,<0.29).
+    "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",
-    "httpx==0.28.1",
     "ruff==0.16.7",
 ]
 

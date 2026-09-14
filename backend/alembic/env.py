@@ -8,9 +8,11 @@ sintoma aparece lejos de la causa.
 from logging.config import fileConfig
 
 from alembic import context
+from geoalchemy2 import alembic_helpers
 from sqlalchemy import engine_from_config, pool
 
 from app.config import settings
+from app.models import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
@@ -18,8 +20,7 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Sin modelos todavia: la fase 0 solo instala la extension.
-target_metadata = None
+target_metadata = Base.metadata
 
 # PostGIS crea sus propias tablas e indices. Sin este filtro, el autogenerate
 # propone borrarlos en la siguiente migracion.
@@ -55,6 +56,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_object=include_object,
+            render_item=alembic_helpers.render_item,
             compare_type=True,
         )
         with context.begin_transaction():

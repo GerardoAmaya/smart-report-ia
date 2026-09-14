@@ -21,7 +21,7 @@ make up
 |---|---|
 | API | http://localhost:8000/health |
 | Docs | http://localhost:8000/docs |
-| Web | http://localhost:3000 |
+| Web | http://localhost:3100 |
 
 `make up` levanta Postgres con PostGIS, corre las migraciones y sirve API y
 frontend. La primera vez tarda: construye las dos imágenes.

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     model_probe_timeout_seconds: float = 5.0
 
     environment: str = "dev"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3100"
 
     @property
     def cors_origin_list(self) -> list[str]:

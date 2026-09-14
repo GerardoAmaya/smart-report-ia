@@ -262,8 +262,10 @@ medido, no con una promesa.
 | Qué | Cómo se obtiene |
 |---|---|
 | Exactitud de clasificación | 200 fotos etiquetadas a mano, por categoría |
+| Costo de clasificación por foto | Medido: USD 0,0018 con haiku-4.5 y miniatura |
 | Agrupaciones incorrectas | Tasa de falsos positivos, el error grave |
 | Agrupaciones perdidas | Tasa de falsos negativos, el error molesto |
+| Costo de almacenamiento por foto | Medido sobre fotos reales: USD 0,0000201 (n=1) |
 | Costo por reporte | Tokens más almacenamiento, medido sobre uso real |
 
 Y dos operativas que solo existen con uso real: mediana hasta la primera

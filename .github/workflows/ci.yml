@@ -25,6 +25,10 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://smart_report:smart_report@localhost:5432/smart_report
       ENVIRONMENT: ci
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_BUCKET: smart-report-photos
+      S3_ACCESS_KEY_ID: smart_report_minio
+      S3_SECRET_ACCESS_KEY: smart_report_minio_dev_only
 
     defaults:
       run:
@@ -32,6 +36,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Almacenamiento de objetos
+        # MinIO como paso y no como service: la imagen pide el argumento
+        # "server", y services no deja cambiar el comando comodamente. Sin esto
+        # la fase 2 no tendria cobertura en CI, que es donde importa.
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=smart_report_minio \
+            -e MINIO_ROOT_PASSWORD=smart_report_minio_dev_only \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+          docker run --rm --network host quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            /bin/sh -c "
+              mc alias set local http://localhost:9000 smart_report_minio smart_report_minio_dev_only &&
+              mc mb --ignore-existing local/smart-report-photos &&
+              mc anonymous set none local/smart-report-photos
+            "
+
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"

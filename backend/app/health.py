@@ -17,6 +17,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from app import storage
 from app.config import settings
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
@@ -125,6 +126,9 @@ def reset_model_cache() -> None:
 def build_health(engine: Engine) -> dict[str, Any]:
     checks: dict[str, Check] = dict(check_database(engine))
     checks["model"] = check_model()
+    # Desde la fase 2 el almacenamiento es una de las cosas sin las cuales el
+    # servicio no puede trabajar: sin bucket, las fotos se quedan en la cola.
+    checks["storage"] = storage.check()
 
     issues = [
         f"{name}: {check.get('detail') or 'fallo sin detalle'}"

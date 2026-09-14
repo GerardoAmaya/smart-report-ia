@@ -37,9 +37,30 @@ class TelegramChannel:
             # eternamente algo que nunca vamos a poder parsear.
             return None
 
-        message = update.effective_message
         user = update.effective_user
-        if message is None or user is None:
+        if user is None:
+            return None
+
+        # Un boton pulsado llega como callback_query, no como mensaje. Sin esto
+        # la confirmacion de la categoria no tendria por donde volver.
+        if update.callback_query is not None:
+            return InboundMessage(
+                channel=self.code,
+                external_update_id=str(update.update_id),
+                external_user_id=str(user.id),
+                received_at=datetime.now(UTC),
+                kind="choice",
+                choice=update.callback_query.data,
+                choice_id=update.callback_query.id,
+                choice_message_id=(
+                    str(update.callback_query.message.message_id)
+                    if update.callback_query.message
+                    else None
+                ),
+            )
+
+        message = update.effective_message
+        if message is None:
             return None
 
         comun = {
@@ -106,6 +127,54 @@ class TelegramChannel:
             cuerpo["reply_markup"] = {"remove_keyboard": True}
         return cuerpo
 
+    def ask(self, external_user_id: str, text: str, options: list[tuple[str, str]]) -> dict:
+        """Pregunta con botones, para devolver en el cuerpo del webhook."""
+        return {
+            "method": "sendMessage",
+            "chat_id": external_user_id,
+            "text": text,
+            "reply_markup": {
+                # Una opcion por fila: las etiquetas son palabras y en dos
+                # columnas Telegram las corta en pantallas angostas.
+                "inline_keyboard": [
+                    [{"text": etiqueta, "callback_data": valor}] for etiqueta, valor in options
+                ]
+            },
+        }
+
+    def ack_choice(self, choice_id: str, text: str = "") -> dict:
+        """Telegram deja el boton girando hasta que se acusa recibo.
+
+        El texto sale como aviso emergente sobre el chat. Para una confirmacion
+        corta alcanza, y evita mandar un mensaje aparte —que seria una llamada
+        de red dentro del webhook, justo lo que no puede haber aqui.
+        """
+        cuerpo: dict = {"method": "answerCallbackQuery", "callback_query_id": choice_id}
+        if text:
+            cuerpo["text"] = text
+        return cuerpo
+
+    def edit_with_options(
+        self, external_user_id: str, message_id: str, text: str, options: list[tuple[str, str]]
+    ) -> dict:
+        """Cambia el mensaje de los botones en el sitio.
+
+        Editar en vez de mandar otro mensaje deja la conversacion limpia —no se
+        acumulan preguntas viejas con botones que ya no valen— y cabe en el
+        cuerpo del webhook.
+        """
+        return {
+            "method": "editMessageText",
+            "chat_id": external_user_id,
+            "message_id": int(message_id),
+            "text": text,
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{"text": etiqueta, "callback_data": valor}] for etiqueta, valor in options
+                ]
+            },
+        }
+
     # --- Red: fase 2 en adelante ---
 
     def _bot(self):
@@ -128,3 +197,19 @@ class TelegramChannel:
         bot = self._bot()
         async with bot:
             await bot.send_message(chat_id=external_user_id, text=text)
+
+    async def ask_out_of_band(
+        self, external_user_id: str, text: str, options: list[tuple[str, str]]
+    ) -> None:
+        """Pregunta con botones desde el trabajador, fuera del webhook."""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+        bot = self._bot()
+        async with bot:
+            await bot.send_message(
+                chat_id=external_user_id,
+                text=text,
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton(e, callback_data=v)] for e, v in options]
+                ),
+            )

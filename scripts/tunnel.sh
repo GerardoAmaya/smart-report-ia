@@ -176,12 +176,13 @@ echo "  el tunel llega hasta la API."
 
 WEBHOOK="${URL}/webhooks/telegram"
 
-# allowed_updates limita a lo unico que sabemos manejar. Cada tipo que no se
-# pide es superficie que no hay que defender.
+# allowed_updates limita a lo que sabemos manejar. Cada tipo que no se pide es
+# superficie que no hay que defender. callback_query entra en la fase 3: es
+# por donde vuelve la confirmacion de la categoria.
 RESPUESTA="$(curl -sS -X POST "${API}/setWebhook" \
   --data-urlencode "url=${WEBHOOK}" \
   --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
-  --data-urlencode 'allowed_updates=["message"]' \
+  --data-urlencode 'allowed_updates=["message","callback_query"]' \
   --data-urlencode "max_connections=20" \
   --data-urlencode "drop_pending_updates=true")"
 

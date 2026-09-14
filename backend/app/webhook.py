@@ -128,4 +128,23 @@ def telegram_webhook(
     session.commit()
     log.info("update %s procesado: %s", update_id, mensaje.kind)
 
+    if respuesta.choice_id:
+        # Una eleccion se contesta entera dentro de esta misma respuesta HTTP.
+        # Antes se mandaba un mensaje aparte desde BackgroundTasks, que es una
+        # llamada de red saliente: rompia la regla de la fase 1 y se notaba en
+        # el boton, que giraba segundos antes de resolverse.
+        if respuesta.options and respuesta.edit_message_id:
+            # Reemplaza la pregunta por la siguiente, en el sitio.
+            return canal.edit_with_options(
+                mensaje.external_user_id,
+                respuesta.edit_message_id,
+                respuesta.text,
+                respuesta.options,
+            )
+        # Confirmacion corta: aviso emergente y se acabo.
+        return canal.ack_choice(respuesta.choice_id, respuesta.text)
+
+    if respuesta.options:
+        return canal.ask(mensaje.external_user_id, respuesta.text, respuesta.options)
+
     return canal.ack(mensaje.external_user_id, respuesta.text, respuesta.ask_location)

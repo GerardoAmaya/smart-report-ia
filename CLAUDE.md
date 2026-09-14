@@ -37,28 +37,23 @@ Este principio no se negocia: es lo que hace el sistema verificable.
 
 ## Estado
 
-**Fase 0 cerrada y verificada.** Lo que existe:
-
-- Docker Compose con Postgres 17 y PostGIS 3.5
-- FastAPI con `/health` que comprueba PostGIS, revisión de esquema y conexión
-  con el modelo
-- Alembic con la migración `0001` (extensión PostGIS)
-- CI en GitHub Actions: ruff, migraciones en ambas direcciones, pytest, y
-  lint/typecheck/build del frontend
-- Frontend Next.js que lee `/health` y distingue «degradado» de «sin respuesta»
-
-**Fase 1 escrita, pendiente la verificación con teléfono.** Lo que existe:
+**Fases 0, 1 y 2 cerradas y verificadas. Fases 3 y 4 escritas.** Lo que existe:
 
 - `InboundChannel` como contrato, con Telegram como primera implementación
-- Webhook en `POST /webhooks/telegram`, con secreto, límite por IP y por
-  usuario, tope de cuerpo y cabeceras de seguridad
-- Cinco tablas nuevas, una migración cada una, y seeders versionados aparte
-- MinIO en compose como destino de las fotos (nada lo escribe hasta la fase 2)
-- 32 pruebas en verde; webhook con mediana de 3,9 ms y p95 de 9,7 ms en local
+- Webhook con secreto, límites, tope de cuerpo y **cero llamadas de red salientes**
+- Trabajador aparte con dos colas en Postgres: fotos y clasificación
+- Miniaturas, huella perceptual y retención que borra de verdad, huérfanos incluidos
+- Clasificación con salida por esquema y confirmación por botones en el bot
+- Agrupación por código con distancia PostGIS, evidencia escrita y deshacer
+- Trece migraciones, una por tabla, y seeders versionados aparte
+- 142 pruebas en verde
 
-Falta el último paso de la verificación: un reporte real desde un teléfono.
+**Las fases 3 y 4 no están cerradas:** sus verificaciones piden doscientas fotos
+etiquetadas y doscientos reportes agrupados a mano, y eso no existe todavía. El
+código para medirlo sí, y avisa cuando la muestra es insuficiente en vez de dar
+un número.
 
----
+**Siguiente: fase 5 — el tablero.** Avisar antes de empezarla.
 
 ## Decisiones tomadas
 
@@ -146,6 +141,113 @@ para siempre algo que nunca va a poder parsearse.
 no falla: revienta con un `TypeError`, que es peor porque parece otra cosa. Es
 la misma forma que la nota de TypeScript.
 
+**El costo se mide con fotos reales, nunca sintéticas.** Se intentó al revés
+en la fase 2 y salió un 28,5 % bajo: las sintéticas se calibraron por el tamaño
+del original, pero su miniatura pesaba 2,6 veces menos que la de una foto de
+verdad, porque el detalle real no comprime a 320px como una textura generada.
+El rendimiento sí se mide con sintéticas; ahí el contenido no cambia nada.
+
+**La cola de fotos es la propia tabla de fotos.** El trabajo *es* la fila, y una
+tabla genérica de trabajos sería infraestructura para un segundo tipo de trabajo
+que todavía no existe. Cuando llegue la clasificación, se decide con dos casos a
+la vista en vez de uno imaginado.
+
+**Se marca `processing` y se confirma antes de descargar.** Mantener la
+transacción abierta durante la descarga tendría la fila bloqueada varios
+segundos, y una transacción larga estorba a toda la base. El precio es
+`locked_at` y un reclamo de filas huérfanas, que es más barato que lo otro.
+
+**Se distingue el fallo transitorio del permanente.** La red vuelve a la cola
+con espera creciente; un archivo que no es imagen queda en `failed` a la
+primera. Reintentar lo permanente llega a la misma conclusión pagando cinco
+veces el ancho de banda.
+
+**La imagen se valida abriéndola, no olfateando sus bytes.** Un archivo con
+cabecera JPEG y basura detrás pasa cualquier número mágico y revienta después.
+Además ahorra `libmagic` como dependencia del sistema.
+
+**El original se guarda sin reencodear.** Es evidencia; reencodearla la altera.
+La miniatura va aparte y siempre en JPEG.
+
+**Los duplicados se detectan pero no se comparten bytes.** El `content_sha256`
+dice que dos reportes traen la misma foto —señal que la fase 4 quiere— pero cada
+uno guarda su copia. Compartir bytes obliga a contar referencias, y contarlas
+mal es cómo la retención borra una foto que otro caso todavía usaba.
+
+**Las pruebas corren contra `smart_report_test`, nunca contra desarrollo.** Esto
+no es pulcritud: la suite vacía tablas entre casos, y apuntando a la base de
+desarrollo borra reportes reales. Pasó — un reporte mandado desde un teléfono
+desapareció en un `make test`. Hay un guardia que se niega a correr si la URL no
+termina en `_test`, antes del primer TRUNCATE y no después.
+
+**Ningún registro puede llevar credenciales.** `python-telegram-bot` habla por
+httpx, httpx registra la URL completa en INFO, y la URL de Telegram lleva el
+token **dentro de la ruta**: el trabajador lo escupía en cada llamada. Se tapa
+con un filtro en la raíz y además httpx queda en WARNING. Dos defensas porque
+esta es la vía que ya falló una vez.
+
+**El costo se mide con fotos reales, nunca sintéticas.** Se intentó al revés
+en la fase 2 y salió un 28,5 % bajo: las sintéticas se calibraron por el tamaño
+del original, pero su miniatura pesaba 2,6 veces menos que la de una foto real.
+El rendimiento sí se mide con sintéticas; ahí el contenido no cambia nada.
+
+**La imagen es dos tercios del costo de clasificar.** De 2 627 tokens, 858 son
+el prompt y 1 769 la imagen. Encogerla a miniatura ahorra más que cambiar de
+modelo, y el ahorro sirve con cualquiera de los tres.
+
+**El clasificador usa `haiku-4.5` con miniatura**, elegido con el saldo a la
+vista: USD 0,0018 por foto. Cuál conviene de verdad se decide con la matriz de
+confusión, no de memoria. Subir de modelo es cambiar `CLASSIFY_MODEL`.
+
+**El texto de quien reporta es pista, no instrucción.** El prompt lo dice
+explícitamente y el modelo lo respeta: con una foto de un patio y el texto
+«Bache en Av Manuel» devolvió `no_es_reporte`. Es la defensa contra inyección
+por pie de foto.
+
+**La agrupación tiene tres salidas, no dos.** `grouped`, `doubtful` y `alone`.
+La banda de duda existe porque la asimetría manda: lo que queda en el límite
+abre su propio caso con el candidato anotado, equivocándose hacia el error
+molesto y nunca hacia el grave.
+
+**Se agrupa por la categoría confirmada, nunca por la propuesta.** Agrupar con
+lo que sugirió el modelo sin confirmar sería dejarlo decidir agrupaciones por la
+puerta de atrás, que es justo lo que PLAN.md reserva para el código.
+
+**La huella perceptual no fuerza uniones.** Una imagen idéntica a 60 m puede ser
+un reenvío con ubicación propia, o sea una agrupación falsa de las graves. Se
+anota como evidencia y deja el reporte dudoso; nunca lo junta sola.
+
+**El comprobador de agrupación no importa el agrupador**, y hay una prueba que
+falla si alguien lo agrega. Medir con la lógica que decide mide consistencia
+consigo misma.
+
+**Las pruebas vacían la base entera, derivada del esquema.** La lista escrita a
+mano se quedó vieja al llegar la fase 4 y los casos se filtraban entre pruebas:
+fallos que solo aparecían en la suite completa y desaparecían al correr la
+prueba sola. Ahora sale de `Base.metadata`.
+
+**El reloj del limitador es una función propia.** La ventana es fija y arranca
+en el reloj de pared; una prueba que cruza el borde ve el contador reiniciarse.
+Una prueba de seguridad que falla de vez en cuando enseña a ignorar el rojo.
+
+**Ningún código puede vaciar la base de desarrollo.** Un listener en el motor
+bloquea `TRUNCATE`, `DROP` y `DELETE`/`UPDATE` sin `WHERE` salvo que la base
+termine en `_test`. Va enganchado al motor y no en cada sitio que borra: un
+guardia que hay que acordarse de llamar protege solo al que ya iba con cuidado.
+Pasó dos veces —la suite apuntando a desarrollo, y después un script de
+depuración a mano— y las dos se perdió un reporte real. La escotilla es
+`ALLOW_DESTRUCTIVE_SQL=1`, variable de entorno para que se vea.
+
+**El bucket de pruebas también va aparte.** Aislar la base sin aislar el
+almacenamiento deja el mismo agujero con otra forma: una prueba del barrido de
+huérfanos borró objetos reales, porque «huérfano» significa «ningún registro lo
+apunta» y los registros de desarrollo no están en la base de pruebas.
+
+**La retención barre huérfanos**, con 24 horas de gracia. El trabajador sube los
+bytes y después confirma la fila; sin margen, barrer durante esa ventana
+borraría una foto que estaba entrando. Sin este barrido, un objeto que perdió su
+fila queda fuera del alcance de la política para siempre.
+
 **Dos formas de entrar (fase 5):** Google para uso normal y contraseña para un
 usuario de prueba público. Google dice quién es, no si puede entrar: la
 autorización es una tabla de correos permitidos con su rol. La contraseña del
@@ -184,6 +286,9 @@ no del proyecto:
   el despliegue: la arquitectura del proveedor decide.
 - **El frontend entra por `localhost:3100`**, no 3000, porque el 3000 está
   ocupado por otro proyecto en esta máquina.
+- **Postgres entra por `localhost:5433`**, no 5432, por lo mismo. Dentro de
+  compose los servicios siguen hablándole a `db:5432`; esto solo afecta a un
+  `psql` desde el host.
 - **`CORS_ORIGINS` apunta a 3100** por lo mismo.
 
 ## Comandos
@@ -199,6 +304,12 @@ no del proyecto:
 | `make tunnel` | túnel HTTPS y registro del webhook en Telegram |
 | `make webhook` | qué dice Telegram del webhook ahora mismo |
 | `make reports` | últimos reportes con coordenadas y fotos |
+| `make photos` | estado de la cola de fotos |
+| `make bench` | costo por foto, medido sobre las reales |
+| `make retention` | aplica la política de retención |
+| `make accuracy` | exactitud de clasificación, con las confirmaciones |
+| `make grouping` | casos y evidencia de cada unión |
+| `make grouping-eval f=…` | las dos tasas, por separado |
 | `make revision m="…"` | nueva migración autogenerada |
 | `make nuke` | baja todo y borra los datos |
 
@@ -237,8 +348,19 @@ contra el segundo error, no contra el promedio de los dos.
   cambio es local a `rate_limit.py`.
 - **`report_photos.kind` ya admite `evidence`** pero nadie lo escribe hasta la
   fase 6.
-- **Nada lee MinIO todavía.** El bucket se crea y queda privado; el trabajador
-  que sube los bytes es de la fase 2.
+- **Los umbrales de agrupación son razonados, no medidos.** 30 y 80 metros,
+  elegidos por la precisión típica del GPS de un teléfono. PLAN.md pide
+  calibrarlos contra doscientos reportes agrupados a mano.
+- **Un reporte dudoso no se revisa desde ningún lado todavía.** Queda
+  marcado con su motivo esperando el tablero de la fase 5.
+- **El costo por foto tiene una sola muestra real.** `make bench` lo recalcula
+  con lo que haya en la base; conviene repetirlo cuando entren reportes.
+- **La retención se corre a mano.** No hay tarea programada todavía; en la
+  fase 8 tiene que entrar al despliegue o la política queda escrita y sin
+  aplicar, que es peor que no tenerla.
+- **Un `asyncio.run` por foto en el trabajador.** Monta un bucle de eventos
+  por descarga. Es invisible al lado de la red, pero si algún día se procesan
+  miles por minuto, ahí está.
 - **El puerto 3100 y el `CORS_ORIGINS` están fijos en el compose.** Quien clone
   el repo con el 3000 libre va a entrar por un puerto que el README no explica.
 - **`EXTRACTION_MODEL` se quitó de `.env.example`** al reescribirlo en la

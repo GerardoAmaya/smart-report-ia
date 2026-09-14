@@ -8,15 +8,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from geoalchemy2 import Geography
 from sqlalchemy import (
+    JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -34,7 +39,14 @@ class Base(DeclarativeBase):
 # Estados posibles, declarados una vez y usados por el CHECK de la base. Un
 # estado invalido tiene que fallar en el INSERT, no descubrirse en el tablero.
 REPORT_STATUSES = ("incomplete", "received", "rejected")
-PHOTO_STATUSES = ("pending", "stored", "failed", "rejected")
+# "doubtful" es el estado que pide PLAN.md: lo que queda en el limite no se
+# agrupa ni se descarta, se marca con el motivo esperando decision humana.
+GROUPING_STATUSES = ("pending", "grouped", "alone", "doubtful")
+CASE_STATUSES = ("open", "assigned", "in_progress", "closed", "discarded")
+# "alone" incluido: un reporte sin nada cerca tambien deja constancia, y esa
+# constancia es lo que deja ver que no se agrupo por decision y no por olvido.
+GROUPING_DECISIONS = ("grouped", "rejected", "doubtful", "alone")
+PHOTO_STATUSES = ("pending", "processing", "stored", "failed", "rejected")
 PHOTO_KINDS = ("report", "evidence")
 
 
@@ -116,6 +128,15 @@ class Report(Base):
     caption: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), nullable=False, server_default="incomplete")
 
+    # SET NULL en la migracion, no CASCADE: deshacer una agrupacion devuelve los
+    # reportes, no los borra.
+    case_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cases.id", ondelete="SET NULL")
+    )
+    grouping_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="pending"
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -131,6 +152,15 @@ class Report(Base):
         # ventana, y es una busqueda por rango sobre estas dos columnas.
         Index("ix_reports_user_created", "external_user_id", "created_at"),
         Index("ix_reports_status_created", "status", "created_at"),
+        Index("ix_reports_case", "case_id"),
+        Index(
+            "ix_reports_grouping_pending",
+            "created_at",
+            postgresql_where=text("grouping_status = 'pending'"),
+        ),
+        CheckConstraint(
+            "grouping_status IN " + str(GROUPING_STATUSES), name="ck_reports_grouping_status"
+        ),
     )
 
 
@@ -165,6 +195,10 @@ class ReportPhoto(Base):
     # pagar el ancho de banda del abuso.
     declared_bytes: Mapped[int | None] = mapped_column(Integer)
 
+    # Huella perceptual: 64 bits que sobreviven al reescalado. Detecta la
+    # misma foto reenviada; NO dos fotos distintas del mismo bache.
+    phash: Mapped[int | None] = mapped_column(BigInteger)
+
     # Lo rellena el trabajador de la fase 2. Nulo no es un error: es "todavia
     # no subida", y por eso el estado lo dice aparte.
     storage_key: Mapped[str | None] = mapped_column(Text)
@@ -174,8 +208,20 @@ class ReportPhoto(Base):
     height: Mapped[int | None] = mapped_column(Integer)
     mime_type: Mapped[str | None] = mapped_column(String(64))
 
+    # La miniatura va aparte: el original se guarda tal cual llego, sin
+    # reencodear, porque es evidencia.
+    thumbnail_key: Mapped[str | None] = mapped_column(Text)
+    thumbnail_bytes: Mapped[int | None] = mapped_column(Integer)
+
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
     failure_reason: Mapped[str | None] = mapped_column(Text)
+
+    # Reintentos con espera creciente, y marca de quien la tiene tomada. Sin
+    # locked_at, un trabajador que muere a mitad de una descarga deja la fila
+    # en processing para siempre.
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -194,10 +240,204 @@ class ReportPhoto(Base):
         # Parcial: la cola de la fase 2 solo mira las pendientes, y el indice
         # no tiene por que crecer con cada foto ya subida.
         Index(
+            "ix_report_photos_phash",
+            "phash",
+            postgresql_where=text("phash IS NOT NULL"),
+        ),
+        Index(
             "ix_report_photos_pending",
+            "next_attempt_at",
             "created_at",
             postgresql_where=text("status = 'pending'"),
         ),
+        Index(
+            "ix_report_photos_processing",
+            "locked_at",
+            postgresql_where=text("status = 'processing'"),
+        ),
+    )
+
+
+CLASSIFICATION_STATUSES = (
+    "pending",
+    "processing",
+    "proposed",
+    "confirmed",
+    "corrected",
+    "failed",
+)
+
+
+class Classification(Base):
+    """Un intento de clasificar un reporte.
+
+    Tabla aparte y no columnas en `reports`: va a haber mas de uno por reporte
+    —reintentos, modelos distintos, reclasificar cuando mejore el prompt— y
+    aplastarlo contra el reporte perderia con que se clasifico cada cosa, que es
+    justo lo que esta fase tiene que medir.
+    """
+
+    __tablename__ = "classifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reports.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+
+    # Lo que propone el modelo. Nunca es la categoria final.
+    proposed_category: Mapped[str | None] = mapped_column(String(32))
+    proposed_severity: Mapped[str | None] = mapped_column(String(16))
+    proposed_reason: Mapped[str | None] = mapped_column(Text)
+
+    # Lo que quedo tras confirmar. La diferencia entre las dos columnas es la
+    # medida de acierto en uso real, sin etiquetar nada a mano.
+    final_category: Mapped[str | None] = mapped_column(String(32))
+    final_severity: Mapped[str | None] = mapped_column(String(16))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    model: Mapped[str | None] = mapped_column(String(64))
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 8))
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    image_variant: Mapped[str | None] = mapped_column(String(16))
+
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN " + str(CLASSIFICATION_STATUSES), name="ck_classifications_status"
+        ),
+        Index("ix_classifications_report", "report_id"),
+        Index(
+            "ix_classifications_pending",
+            "next_attempt_at",
+            "created_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index(
+            "ix_classifications_processing",
+            "locked_at",
+            postgresql_where=text("status = 'processing'"),
+        ),
+    )
+
+
+class Case(Base):
+    """Un problema real. Varios reportes pueden apuntar al mismo.
+
+    Descubrir eso es la razon de ser del sistema: cuarenta y siete reportes en
+    un dia son dieciocho problemas.
+    """
+
+    __tablename__ = "cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="open")
+    category: Mapped[str | None] = mapped_column(String(32))
+    severity: Mapped[str | None] = mapped_column(String(16))
+
+    # Se recalcula al entrar un reporte nuevo. Comparar contra el centro es mas
+    # estable que contra el primer reporte, que por ser el primero no tiene por
+    # que ser el mas exacto.
+    centroid: Mapped[object | None] = mapped_column(
+        Geography(geometry_type="POINT", srid=4326, spatial_index=False)
+    )
+    report_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN " + str(CASE_STATUSES), name="ck_cases_status"),
+        Index("ix_cases_centroid_gist", "centroid", postgresql_using="gist"),
+        Index("ix_cases_category_status", "category", "status"),
+    )
+
+
+class GroupingEvidence(Base):
+    """Por que un reporte entro a un caso, o por que no entro.
+
+    Un numero de confianza que cada quien interpreta distinto no sirve. Una
+    lista de reportes cercanos con la distancia escrita, si. Se guardan tambien
+    los descartes: saber que se decidio no agrupar es tan util como lo otro.
+    """
+
+    __tablename__ = "grouping_evidence"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reports.id", ondelete="CASCADE"), nullable=False
+    )
+    case_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE")
+    )
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    # Cada senal en su unidad y por separado. Un solo puntaje combinado no se
+    # puede discutir; "a 12 metros y misma categoria" si.
+    distance_m: Mapped[float | None] = mapped_column(Float)
+    category_match: Mapped[bool | None] = mapped_column(Boolean)
+    hours_apart: Mapped[float | None] = mapped_column(Float)
+    text_similarity: Mapped[float | None] = mapped_column(Float)
+    visual_distance: Mapped[int | None] = mapped_column(Integer)
+
+    # En español y legible: el tablero lo muestra tal cual.
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    # Con que umbrales se decidio. Sin esto, una agrupacion vieja no se puede
+    # interpretar despues de recalibrar.
+    thresholds: Mapped[dict | None] = mapped_column(JSON)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN " + str(GROUPING_DECISIONS), name="ck_grouping_evidence_decision"
+        ),
+        Index("ix_grouping_evidence_report", "report_id"),
+        Index("ix_grouping_evidence_case", "case_id"),
+    )
+
+
+class User(Base):
+    """Quien puede entrar al tablero, y con que rol.
+
+    Google dice quien es; esta tabla dice si puede. Sin ella, cualquiera con una
+    cuenta de Google entraria al tablero de una institucion.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # En minusculas siempre: los proveedores no coinciden en el uso de
+    # mayusculas, y comparar sin normalizar deja entrar un correo dos veces o
+    # ninguna.
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(128))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'operator', 'demo')", name="ck_users_role"),
+        Index("ix_users_email", "email", unique=True),
     )
 
 

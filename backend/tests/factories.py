@@ -76,3 +76,33 @@ def update_con_sticker(update_id: int = 4, user_id: int = 4242) -> dict:
         "type": "regular",
     }
     return payload
+
+
+def update_con_boton(
+    update_id: int = 50,
+    user_id: int = 4242,
+    data: str = "s:00000000-0000-0000-0000-000000000000",
+    message_id: int = 900,
+) -> dict:
+    """Un boton pulsado llega como callback_query, no como mensaje.
+
+    Telegram solo manda este tipo si el webhook se registro con
+    allowed_updates que lo incluya; si falta, la pulsacion se descarta en
+    silencio y el boton gira para siempre. Paso una vez.
+    """
+    return {
+        "update_id": update_id,
+        "callback_query": {
+            "id": f"cb{update_id}",
+            "from": {"id": user_id, "is_bot": False, "first_name": "Vecina"},
+            "chat_instance": "x",
+            "data": data,
+            "message": {
+                "message_id": message_id,
+                "date": _FECHA,
+                "chat": {"id": user_id, "type": "private"},
+                "from": {"id": 999, "is_bot": True, "first_name": "Bot"},
+                "text": "¿Es correcto?",
+            },
+        },
+    }

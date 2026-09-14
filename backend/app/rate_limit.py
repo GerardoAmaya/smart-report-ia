@@ -46,6 +46,17 @@ class RateLimitResult:
     retry_after_seconds: int
 
 
+def ahora() -> datetime:
+    """Momento actual, en una funcion propia para poder fijarlo al probar.
+
+    La ventana es fija y arranca en el reloj de pared, asi que una prueba
+    que cruce el borde veria el contador reiniciarse a mitad. Es raro, pero
+    una prueba de seguridad que falla una vez cada tanto enseña a ignorar el
+    rojo, que es peor que la prueba misma.
+    """
+    return datetime.now(UTC)
+
+
 def window_start(now: datetime, window_seconds: int) -> datetime:
     """Inicio de la ventana fija que contiene a `now`."""
     epoch = int(now.timestamp())
@@ -66,7 +77,7 @@ def hit(
     Cuenta siempre, incluso cuando ya se paso: asi el que insiste sigue viendo
     la puerta cerrada durante toda la ventana en vez de colar una por ciclo.
     """
-    now = now or datetime.now(UTC)
+    now = now or ahora()
     inicio = window_start(now, window_seconds)
 
     count = session.execute(_HIT, {"scope": scope, "key": key, "window_start": inicio}).scalar_one()

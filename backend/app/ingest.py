@@ -46,6 +46,12 @@ DEMASIADOS = "Ya mandaste varios reportes en poco rato. Intenta de nuevo mas tar
 class Reply:
     text: str
     ask_location: bool = False
+    # Botones, cuando la respuesta es una pregunta cerrada.
+    options: list[tuple[str, str]] | None = None
+    # Id de la pulsacion que hay que acusar, si la hubo.
+    choice_id: str | None = None
+    # Mensaje a reemplazar, cuando la respuesta son otras opciones.
+    edit_message_id: str | None = None
 
 
 def record_raw(
@@ -146,6 +152,8 @@ def handle(session: Session, message: InboundMessage, inbound_update_id: int | N
         return Reply(PEDIR_FOTO)
     if message.kind == "text":
         return _handle_text(session, message)
+    if message.kind == "choice":
+        return _handle_choice(session, message)
     return Reply(NO_ENTIENDO)
 
 
@@ -252,3 +260,19 @@ def _handle_text(session: Session, message: InboundMessage) -> Reply:
     if reporte.status == "incomplete":
         return Reply(DETALLE_Y_FALTA_UBICACION, ask_location=True)
     return Reply(DETALLE_GUARDADO)
+
+
+def _handle_choice(session: Session, message: InboundMessage) -> Reply:
+    """Un boton pulsado: confirmar o corregir la categoria propuesta."""
+    from app import confirm
+
+    if not message.choice:
+        return Reply(NO_ENTIENDO)
+
+    texto, opciones = confirm.handle_choice(session, message.external_user_id, message.choice)
+    return Reply(
+        texto,
+        options=opciones or None,
+        choice_id=message.choice_id,
+        edit_message_id=message.choice_message_id,
+    )

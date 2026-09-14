@@ -16,6 +16,16 @@ dependencies = [
     "python-telegram-bot==22.8",
     # Deja de ser solo de pruebas: PTB lo exige en runtime (>=0.27,<0.29).
     "httpx==0.28.1",
+    # Almacenamiento de objetos. Sincrono: corre en el trabajador, fuera del
+    # camino del webhook. aioboto3 clavaria una version vieja de aiobotocore.
+    "boto3==1.43.93",
+    # Miniaturas y validacion. Abrir la imagen comprueba mas que olfatear
+    # sus primeros bytes, y ahorra libmagic como dependencia del sistema.
+    "pillow==12.3.0",
+    # Entrada con Google. Se construye el cliente al vuelo, no al importar.
+    "authlib==1.8.0",
+    # Firma la cookie de sesion de Starlette.
+    "itsdangerous==2.2.0",
 ]
 
 [project.optional-dependencies]

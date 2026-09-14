@@ -17,5 +17,16 @@ print('secreto configurado     ', d.get('has_custom_certificate') is not None an
 print('updates pendientes      ', d.get('pending_update_count'))
 print('ultimo error            ', d.get('last_error_message') or 'ninguno')
 print('conexiones maximas      ', d.get('max_connections'))
-print('tipos permitidos        ', d.get('allowed_updates') or 'todos')
+permitidos = d.get('allowed_updates') or []
+print('tipos permitidos        ', permitidos or 'todos')
+
+# Un tipo que el codigo maneja pero Telegram no manda es un fallo mudo: el
+# boton gira para siempre y no hay error en ningun lado. Paso una vez.
+ESPERADOS = {'message', 'callback_query'}
+faltan = ESPERADOS - set(permitidos) if permitidos else set()
+if faltan:
+    print()
+    print('  AVISO: Telegram no esta mandando', ', '.join(sorted(faltan)) + '.')
+    print('  Los botones de confirmacion no van a volver. Arreglar con:')
+    print('    make tunnel   (vuelve a registrar el webhook)')
 "

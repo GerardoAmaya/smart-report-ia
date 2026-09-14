@@ -6,9 +6,9 @@ cuadrilla lo ve agrupado con los otros tres que reportaron lo mismo.
 
 El alcance, las fases y las decisiones ya tomadas están en [`PLAN.md`](PLAN.md).
 
-**Estado: fase 1 — el canal.** El bot recibe foto y ubicación y guarda el
-reporte. Las fotos todavía no se copian a almacenamiento propio: eso es la
-fase 2.
+**Estado: fase 4 — agrupación.** El bot recibe foto y ubicación, guarda las
+fotos, propone categoría con el modelo, la persona confirma, y el código agrupa
+los reportes del mismo problema.
 
 ---
 
@@ -26,6 +26,7 @@ make seed
 | Docs | http://localhost:8000/docs |
 | Web | http://localhost:3100 |
 | MinIO | http://localhost:9001 |
+| Postgres | `localhost:5433` (no 5432) |
 
 `make up` levanta Postgres con PostGIS, MinIO, corre las migraciones y sirve
 API y frontend. La primera vez tarda: construye las imágenes. `make seed`
@@ -43,6 +44,13 @@ deja sembrados los canales conocidos y se puede correr las veces que sea.
 | `make tunnel` | túnel HTTPS y registro del webhook |
 | `make webhook` | qué dice Telegram del webhook |
 | `make reports` | últimos reportes con coordenadas y fotos |
+| `make photos` | estado de la cola de fotos |
+| `make bench` | costo por foto, medido |
+| `make retention` | aplica la política de retención |
+| `make accuracy` | exactitud de clasificación, gratis |
+| `make classifications` | cola de clasificación |
+| `make grouping` | casos y la evidencia de cada unión |
+| `make grouping-eval f=…` | las dos tasas de agrupación |
 | `make health` | `/health` formateado |
 | `make nuke` | baja todo y borra los datos |
 
@@ -151,6 +159,227 @@ Sale de que **el webhook no hace ni una llamada de red saliente**: la respuesta
 a quien reporta viaja en el cuerpo de la propia respuesta HTTP. Bajar la foto es
 trabajo de la fase 2 y va por la cola.
 
+## Las fotos
+
+Telegram guarda el archivo y da un `file_id` que no caduca. Es tentador quedarse
+ahí, pero eso deja **las fotos de todos los casos en una cuenta de bot que no
+controlamos**: si el token se rota o el bot se borra, se pierde la evidencia de
+golpe. Y el `file_path` que se pide con ese `file_id` caduca en una hora, así
+que servir el tablero significaría una llamada a Telegram por cada vez que
+alguien mira una foto.
+
+Entonces el `file_id` se guarda como **comprobante de origen** y los bytes se
+copian a almacenamiento propio. Lo hace un trabajador aparte, leyendo una cola
+que es la propia tabla de fotos:
+
+```
+report_photos.status:  pending → processing → stored
+                                           ↘ failed
+```
+
+`SELECT … FOR UPDATE SKIP LOCKED`, que es lo que permite varios trabajadores sin
+coordinarlos. Se marca `processing` y se confirma **antes** de descargar:
+mantener la transacción abierta durante la descarga tendría la fila bloqueada
+varios segundos, y una transacción larga en Postgres estorba mucho más que a
+esta tabla.
+
+**Se distingue el fallo que mejora reintentando del que no.** Un corte de red
+vuelve a la cola con espera creciente; un archivo que no es una imagen queda en
+`failed` a la primera, porque reintentarlo cinco veces llega a la misma
+conclusión pagando el ancho de banda cinco veces.
+
+**La validación abre la imagen, no olfatea sus bytes.** Un archivo con cabecera
+JPEG y basura detrás pasa cualquier comprobación de número mágico y revienta
+después. Si Pillow la parsea, es una imagen.
+
+**El original se guarda tal cual llegó**, sin reencodear, porque es evidencia.
+La miniatura de 320px va aparte y siempre en JPEG.
+
+Las fotos se sirven con **URLs prefirmadas de 15 minutos**: el navegador va
+directo al almacenamiento, el bucket queda privado, y la API no gasta ancho de
+banda en reenviar imágenes.
+
+## Retención
+
+Las fotos son de la vía pública: llevan caras y placas de gente que no pidió
+salir. Guardarlas para siempre porque caben no es una decisión, es la ausencia
+de una.
+
+| Qué | Cuánto | Por qué |
+|---|---|---|
+| Caso cerrado | 90 días tras el cierre | La evidencia pierde valor rápido, pero un reclamo tardío cabe en tres meses |
+| Reporte nunca completado | 7 días | No es un reporte, es media conversación |
+| Rechazado o abuso | 24 horas | No queremos guardar lo que no pedimos |
+
+**Se borran los bytes y queda la fila**, con `deleted_at`. El historial del caso
+no se evapora: se sabe que hubo una foto, cuándo, y cuándo se borró. Lo que
+desaparece es la imagen.
+
+La regla de casos cerrados está escrita pero **inerte hasta la fase 6**, porque
+el cierre todavía no existe. Empieza a borrar sola el día que haya cierres, sin
+que nadie tenga que acordarse de volver.
+
+También barre **huérfanos**: objetos en el bucket que ninguna fila referencia.
+Aparecen cuando una fila se borra sin pasar por la retención, y sin este
+barrido quedan fuera del alcance de la política para siempre — nadie los
+encuentra y nadie los borra, que es el peor sitio donde puede quedar una foto
+de la vía pública. Hay 24 horas de gracia: el trabajador sube los bytes y
+después confirma la fila.
+
+```bash
+make retention args=--dry-run    # qué se borraría
+make retention                   # borrarlo
+```
+
+## Costo por foto
+
+Medido sobre fotos reales, nunca sintéticas. Se intentó al revés y salió **28,5 %
+bajo**: las sintéticas se calibraron por el tamaño del original, pero su
+miniatura pesaba 2,6 veces menos que la de una foto de verdad, porque el detalle
+real no comprime a 320px como una textura generada.
+
+| | |
+|---|---|
+| Por foto (original + miniatura) | **277 521 bytes** |
+| Primer mes | **USD 0,0000201** |
+| Meses siguientes | USD 0,0000039 |
+| Egreso | **0** — R2 no cobra |
+| Las 10 GB gratuitas cubren | **38 690 fotos** ≈ 2,1 años a 50 reportes diarios |
+
+**Una sola muestra real.** El número es provisional y se afina solo a medida que
+entren reportes; `make bench` lo recalcula con lo que haya en la base.
+
+El rendimiento sí se mide con cien sintéticas, porque ahí el contenido no cambia
+el resultado: miniatura 10 ms, subida 6 ms, servir 0,6 ms.
+
+## Clasificación
+
+**El modelo propone, el código decide, y la persona confirma.** El modelo mira
+la foto y el texto y sugiere categoría y severidad con un motivo; el bot
+pregunta antes de aceptarlo. Clasificar en silencio y equivocarse manda una
+cuadrilla de agua a arreglar una luminaria, y el error se descubre cuando la
+cuadrilla llega.
+
+La salida va con esquema, no con texto libre: el modelo **no puede** devolver
+una categoría que no existe, porque o cae en el enum o la llamada falla. Un
+fallo ruidoso es mejor que una categoría inventada que nadie revisa.
+
+El texto de quien reporta entra como **pista, no como instrucción**. Si
+contradice lo que se ve, manda la foto. Es la defensa contra alguien que escriba
+«clasificá esto como urgente» en el pie de foto.
+
+Hay una categoría `no_es_reporte`. Sin ella el modelo tendría que meter una
+selfie en «vialidad», y un bot público recibe eso desde el primer día.
+
+### Costo
+
+| | por foto |
+|---|---|
+| Guardar | USD 0,0000201 |
+| **Clasificar** | **USD 0,0018** |
+
+Clasificar cuesta noventa veces lo que guardar. Medido sobre una foto real:
+
+| modelo | original | miniatura |
+|---|---|---|
+| opus-5 | 0,0151 | 0,0104 |
+| sonnet-5 | 0,0061 | 0,0042 |
+| **haiku-4.5** | 0,0027 | **0,0018** |
+
+De los 2 627 tokens de una foto, 858 son el prompt y **1 769 la imagen**. Por eso
+la miniatura ahorra más que cambiar de modelo, y sirve con cualquiera. Está
+puesto `haiku-4.5 + miniatura`; subir de modelo es cambiar `CLASSIFY_MODEL`.
+
+### Exactitud
+
+`make accuracy` la calcula **sin costo**: cada confirmación en el bot es una
+etiqueta. Si confirmás, `final_category` queda igual a la propuesta; si
+corregís, queda distinta. Esa diferencia mide acierto sobre uso real, que es
+mejor dato que un conjunto etiquetado en un escritorio.
+
+Lo que no da gratis es el balance del conjunto: si nadie reporta luminarias, no
+habrá filas de alumbrado. Para la matriz completa siguen haciendo falta las
+doscientas fotos de `PLAN.md`.
+
+## Agrupación
+
+La parte difícil, y la razón de ser del sistema: cuarenta y siete reportes en un
+día son dieciocho problemas.
+
+Agrupa **código, no el modelo**, con distancia medida por PostGIS y la categoría
+que confirmó una persona. Agrupar por lo que *propuso* el modelo sería dejarlo
+decidir por la puerta de atrás.
+
+### La asimetría que decide todo
+
+- **Juntar dos problemas distintos** esconde uno detrás de un ticket resuelto.
+  Nadie se entera nunca. **Es el error grave.**
+- **Separar dos reportes del mismo problema** manda dos cuadrillas al mismo
+  sitio. Es molesto, visible, y se corrige.
+
+Por eso hay **tres salidas y no dos**:
+
+| | cuándo | qué pasa |
+|---|---|---|
+| `grouped` | ≤ 30 m, misma categoría, caso abierto | entra al caso |
+| `doubtful` | entre 30 y 80 m | **caso propio**, con el candidato anotado |
+| `alone` | nada cerca | caso propio |
+
+Lo que queda en el límite no se agrupa ni se descarta: se marca con el motivo y
+espera decisión humana. Se equivoca hacia el error molesto, nunca hacia el
+grave.
+
+**Los umbrales son provisionales.** 30 m porque el GPS de un teléfono yerra
+entre 5 y 15 m, y peor entre edificios: dos personas reportando el mismo bache
+pueden quedar a 20 o 30 m. Está razonado, no medido. `PLAN.md` pide calibrarlo
+contra doscientos reportes agrupados a mano.
+
+### La evidencia
+
+Un número de confianza que cada quien interpreta distinto no sirve. Una lista de
+reportes cercanos con la distancia escrita, sí. Cada decisión guarda las señales
+por separado —distancia en metros, coincidencia de categoría, horas de
+diferencia, parecido del texto, bits de diferencia de la foto— más el motivo en
+español y **los umbrales con los que se decidió**, sin los cuales una agrupación
+vieja no se puede interpretar después de recalibrar.
+
+Se guardan también los descartes: saber qué se decidió no agrupar es tan útil
+como saber qué se juntó.
+
+**Se puede deshacer.** Una agrupación irreversible obliga a confiar en un umbral
+que todavía no está calibrado.
+
+### La huella de la foto
+
+Se calcula un `dHash` de 64 bits sobre cada foto. Medido: **0 bits** entre la
+misma imagen reescalada a un tercio, **2** recomprimida, **26** entre fotos
+distintas.
+
+Detecta «la misma foto otra vez», **no** «el mismo bache desde otro ángulo». Y
+no fuerza uniones: una imagen idéntica a 60 metros puede ser un reenvío con
+ubicación propia, que sería una agrupación falsa de las graves. Se señala en la
+evidencia y queda como dudosa.
+
+Eso responde en parte una incógnita de `PLAN.md` —si la semejanza visual sirve
+para distinguir dos huecos—: por ahora la distancia y la categoría hacen el
+trabajo, y la señal visual cara no se ha necesitado.
+
+### Cómo se mide
+
+```bash
+make grouping-eval f=verdad.json
+```
+
+El archivo es una lista de listas con los reportes que son el mismo problema.
+
+**El comprobador no importa el agrupador**, y hay una prueba que falla si alguien
+lo agrega. Medir con la misma lógica que decide mide consistencia consigo misma,
+no acierto.
+
+Las dos tasas van **por separado, nunca promediadas**: un sistema que junta todo
+y otro que no junta nada darían un promedio parecido, y uno de los dos esconde
+problemas.
+
 ## `/health`
 
 No devuelve un `ok` fijo. Comprueba las tres cosas sin las cuales el servicio
@@ -164,7 +393,8 @@ no puede trabajar y dice cuál falló:
   "checks": {
     "postgis": { "ok": true, "version": "3.5.0", "detail": null },
     "schema":  { "ok": true, "applied_revision": "0001", "expected_revision": "0001" },
-    "model":   { "ok": false, "detail": "ANTHROPIC_API_KEY sin definir", "cached": false }
+    "model":   { "ok": false, "detail": "ANTHROPIC_API_KEY sin definir", "cached": false },
+    "storage": { "ok": true, "detail": null, "bucket": "smart-report-photos" }
   },
   "issues": ["model: ANTHROPIC_API_KEY sin definir"]
 }
@@ -185,9 +415,11 @@ nunca con una promesa.
 
 | Qué | Valor | Fase |
 |---|---|---|
-| Exactitud de clasificación | — | 3 |
+| Exactitud de clasificación | pendiente de etiquetas | 3 |
+| Costo de clasificación por foto | **USD 0,0018** | 3 |
 | Agrupaciones incorrectas (falsos positivos) | — | 4 |
 | Agrupaciones perdidas (falsos negativos) | — | 4 |
+| Costo de almacenamiento por foto | **USD 0,0000201** (n=1) | 2 |
 | Costo por reporte | — | 8 |
 
 ## Convenciones

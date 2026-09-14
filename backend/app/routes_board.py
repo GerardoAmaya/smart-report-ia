@@ -11,12 +11,13 @@ esconder un boton no impide llamar a la API.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from geoalchemy2 import Geometry
-from sqlalchemy import case, cast, func, select
+from sqlalchemy import case, cast, func, select, text
 
 from app import grouping, storage
 from app.auth import requiere
@@ -317,3 +318,92 @@ def descartar_caso(
     caso.status = "discarded"
     session.commit()
     return {"ok": True}
+
+
+@router.get("/metrics")
+def metricas(
+    usuario: Ver,
+    session: SesionBD,
+    dias: int = Query(30, ge=1, le=365),
+) -> dict:
+    """Lo que el sistema logra, no lo que contiene.
+
+    La cifra de arriba es **la proporcion de reportes que terminan agrupados**,
+    que PLAN.md llama la medida directa de cuanto trabajo ahorra el sistema:
+    cuarenta y siete reportes en un dia son dieciocho problemas. Un tablero que
+    solo lista casos no enseña eso, y es lo unico que justifica todo lo demas.
+    """
+    desde = datetime.now(UTC) - timedelta(days=dias)
+
+    reportes, casos = session.execute(
+        select(
+            func.count(Report.id),
+            func.count(func.distinct(Report.case_id)),
+        ).where(Report.created_at >= desde, Report.case_id.is_not(None))
+    ).one()
+
+    # Entrada por dia. Se rellenan los dias sin reportes: una serie con huecos
+    # dibuja una linea que salta y miente sobre el ritmo real.
+    filas = session.execute(
+        select(
+            func.date_trunc("day", Report.created_at).label("dia"),
+            func.count(Report.id),
+        )
+        .where(Report.created_at >= desde)
+        .group_by(text("dia"))
+        .order_by(text("dia"))
+    ).all()
+    por_dia = {d.date().isoformat(): n for d, n in filas}
+
+    # Desde hoy hacia atras: contar desde `desde` dejaba el ultimo dia en ayer
+    # y la grafica terminaba un dia antes que el reloj, que es de esos fallos
+    # que nadie mira hasta que alguien pregunta por un reporte de hoy.
+    hoy = datetime.now(UTC).date()
+    serie = []
+    for i in range(dias - 1, -1, -1):
+        dia = (hoy - timedelta(days=i)).isoformat()
+        serie.append({"dia": dia, "reportes": por_dia.get(dia, 0)})
+
+    categorias = session.execute(
+        select(Case.category, func.count(Case.id), func.sum(Case.report_count))
+        .where(Case.category.is_not(None), Case.status != "discarded")
+        .group_by(Case.category)
+        .order_by(func.count(Case.id).desc())
+    ).all()
+
+    severidades = dict(
+        session.execute(
+            select(Case.severity, func.count(Case.id))
+            .where(Case.status.in_(("open", "assigned", "in_progress")))
+            .group_by(Case.severity)
+        ).all()
+    )
+
+    dudosos = session.execute(
+        select(func.count(Report.id)).where(Report.grouping_status == "doubtful")
+    ).scalar_one()
+
+    # Lo que costo hasta ahora. Se muestra porque el costo por reporte es una
+    # de las cuatro metricas del proyecto y esconderlo lo volveria una promesa.
+    costo = session.execute(
+        select(func.coalesce(func.sum(Classification.cost_usd), 0))
+    ).scalar_one()
+
+    return {
+        "dias": dias,
+        "reportes": reportes,
+        "casos": casos,
+        # Cuantos reportes se ahorraron de atender por separado.
+        "ahorro": max(0, reportes - casos),
+        "serie": serie,
+        "categorias": [
+            {"categoria": c, "casos": n, "reportes": int(r or 0)} for c, n, r in categorias
+        ],
+        "severidades": {
+            "alta": severidades.get("alta", 0),
+            "media": severidades.get("media", 0),
+            "baja": severidades.get("baja", 0),
+        },
+        "dudosos": dudosos,
+        "costo_usd": float(costo or 0),
+    }

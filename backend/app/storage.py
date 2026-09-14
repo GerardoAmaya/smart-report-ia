@@ -32,16 +32,10 @@ class StoredObject:
     sha256: str
 
 
-@lru_cache(maxsize=1)
-def client():
-    """Cliente S3 compartido.
-
-    Cacheado porque construirlo firma y resuelve configuracion, y el trabajador
-    lo usa en bucle. `s3v4` explicito: R2 solo acepta esa firma.
-    """
+def _construir(endpoint: str):
     return boto3.client(
         "s3",
-        endpoint_url=settings.s3_endpoint_url,
+        endpoint_url=endpoint,
         aws_access_key_id=settings.s3_access_key_id.get_secret_value(),
         aws_secret_access_key=settings.s3_secret_access_key.get_secret_value(),
         region_name=settings.s3_region,
@@ -52,6 +46,28 @@ def client():
             read_timeout=60,
         ),
     )
+
+
+@lru_cache(maxsize=1)
+def public_client():
+    """Cliente que firma contra el endpoint **publico**.
+
+    Solo para firmar: firmar no toca la red, asi que este cliente nunca conecta.
+    Existe porque el navegador corre fuera de la red de compose y no resuelve
+    "minio"; y como la firma v4 incluye el host, cambiar la URL despues de
+    firmarla la invalida.
+    """
+    return _construir(settings.s3_public_endpoint_url or settings.s3_endpoint_url)
+
+
+@lru_cache(maxsize=1)
+def client():
+    """Cliente S3 compartido.
+
+    Cacheado porque construirlo firma y resuelve configuracion, y el trabajador
+    lo usa en bucle. `s3v4` explicito: R2 solo acepta esa firma.
+    """
+    return _construir(settings.s3_endpoint_url)
 
 
 def build_key(report_id: uuid.UUID, photo_id: uuid.UUID, *, kind: str, ext: str) -> str:
@@ -112,7 +128,8 @@ def presigned_url(key: str, expires_seconds: int | None = None) -> str:
     el camino, y el bucket queda privado. La vida corta es lo que limita el
     dano si un enlace se comparte fuera.
     """
-    return client().generate_presigned_url(
+    # public_client y no client: la firma lleva el host dentro.
+    return public_client().generate_presigned_url(
         "get_object",
         Params={"Bucket": settings.s3_bucket, "Key": key},
         ExpiresIn=expires_seconds or settings.s3_presigned_ttl_seconds,

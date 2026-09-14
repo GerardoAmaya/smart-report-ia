@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # --- Almacenamiento de objetos (S3-compatible) ---
     # MinIO en local, R2 al desplegar: mismo protocolo, cambian las variables.
     s3_endpoint_url: str = "http://minio:9000"
+    # Desde donde lo alcanza **el navegador**, que corre en el host y no
+    # dentro de la red de compose: "minio" no existe para el. No se puede
+    # arreglar cambiando el texto de la URL despues de firmarla, porque con
+    # firma v4 el host va dentro de la firma. Al desplegar contra R2 los dos
+    # valores coinciden y esto deja de importar.
+    s3_public_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "smart-report-photos"
     s3_access_key_id: SecretStr = SecretStr("")
     s3_secret_access_key: SecretStr = SecretStr("")

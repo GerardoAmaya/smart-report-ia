@@ -58,7 +58,13 @@ def _crear_bucket_de_pruebas() -> None:
     from app import storage
 
     settings.s3_bucket = f"{BUCKET_DESARROLLO}-test"
+    # Las pruebas corren **dentro** de la red de compose, asi que ahi el
+    # endpoint "publico" es el interno: `localhost:9000` seria el localhost del
+    # propio contenedor. Las pruebas que comprueban el comportamiento publico lo
+    # cambian ellas mismas.
+    settings.s3_public_endpoint_url = settings.s3_endpoint_url
     storage.client.cache_clear()
+    storage.public_client.cache_clear()
     cliente = storage.client()
     try:
         cliente.head_bucket(Bucket=settings.s3_bucket)

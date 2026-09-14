@@ -289,6 +289,10 @@ no del proyecto:
 - **Postgres entra por `localhost:5433`**, no 5432, por lo mismo. Dentro de
   compose los servicios siguen hablándole a `db:5432`; esto solo afecta a un
   `psql` desde el host.
+- **`S3_PUBLIC_ENDPOINT_URL` apunta a `localhost:9000`.** Las URLs firmadas
+  las abre el navegador, que corre en el host y no resuelve `minio`. No se
+  arregla cambiando el texto tras firmar: la firma v4 lleva el host dentro.
+  Al desplegar contra R2 los dos valores coinciden.
 - **`CORS_ORIGINS` apunta a 3100** por lo mismo.
 
 ## Comandos

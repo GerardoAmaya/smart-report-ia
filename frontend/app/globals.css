@@ -1,31 +1,205 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/* La paleta sale del material del problema: asfalto, senalizacion, cono de obra. */
-@theme {
-  --color-fondo: #eeefec;
-  --color-tinta: #16181a;
-  --color-verde: #1f6f5c;
-  --color-ambar: #c77b23;
-  --color-rojo: #b4442e;
-  --color-gris: #7a8288;
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * La paleta sale del material del problema: asfalto, pintura de señalizacion,
+ * cono de obra. Nada de azul corporativo ni de generador de temas.
+ *
+ * shadcn resuelve el comportamiento y la accesibilidad; **el aspecto sigue
+ * siendo propio**. Mapear sus tokens semanticos a esta paleta es lo que evita
+ * que el proyecto se vea como los otros mil que usan el mismo kit — que era el
+ * motivo original para no usar kit, y lo unico de esa decision que se conserva.
+ */
+:root {
+  --asfalto: #eeefec;
+  --tinta: #16181a;
+  --verde: #1f6f5c;
+  --ambar: #c77b23;
+  --rojo: #b4442e;
+  --gris: #7a8288;
+
+  --radius: 0.5rem;
+
+  --background: var(--asfalto);
+  --foreground: var(--tinta);
+  --card: #f7f7f5;
+  --card-foreground: var(--tinta);
+  --popover: #ffffff;
+  --popover-foreground: var(--tinta);
+
+  /* Verde de señalizacion como acento: acciones y foco. */
+  --primary: var(--verde);
+  --primary-foreground: #f4f6f4;
+  --secondary: #e3e4e0;
+  --secondary-foreground: var(--tinta);
+
+  --muted: #e6e7e3;
+  --muted-foreground: var(--gris);
+  --accent: #e3e4e0;
+  --accent-foreground: var(--tinta);
+
+  --destructive: var(--rojo);
+  --destructive-foreground: #f6f2f1;
+
+  --border: color-mix(in oklab, var(--tinta) 12%, transparent);
+  --input: color-mix(in oklab, var(--tinta) 16%, transparent);
+  --ring: var(--verde);
+
+  /* Señales del dominio. Se declaran aqui para que el color signifique lo
+     mismo en todo el tablero y no se elija a ojo en cada componente. */
+  --urgente: var(--rojo);
+  --atencion: var(--ambar);
+  --resuelto: var(--gris);
+
+  /* Rampa ordinal del verde de señalizacion, para magnitud.
+     **Las categorias no llevan color de identidad**: el nombre va en el eje y
+     lo que el color codifica es cuantos casos hay. Eso ademas libera el ambar
+     y el rojo para lo unico que significan —atencion y urgencia—, que se
+     perderia si se gastaran en "alumbrado" y "agua".
+     Validada con el script de la guia: tono unico (4 grados), luminosidad
+     monotona, saltos >= 0.06, y el extremo claro a 2.13:1 sobre la superficie. */
+  --serie-1: #8ab9ad;
+  --serie-2: #649c8f;
+  --serie-3: #428071;
+  --serie-4: #286e5d;
+  --serie-5: #15594a;
+  --serie-6: #093f34;
+
+  --chart-1: var(--serie-4);
+  --chart-2: var(--serie-2);
+  --chart-3: var(--serie-6);
+  --chart-4: var(--serie-3);
+  --chart-5: var(--serie-5);
 }
 
-body {
-  background: var(--color-fondo);
-  color: var(--color-tinta);
+/*
+ * Tema oscuro. El claro manda —es una herramienta que alguien mira ocho horas
+ * con luz de oficina— pero el oscuro sale casi gratis con tokens, y para
+ * enseñar el proyecto pesa.
+ *
+ * No es el claro invertido: los acentos se aclaran para mantener el contraste
+ * sobre fondo oscuro. Un verde de señalizacion sobre asfalto de noche se lee
+ * distinto que de dia.
+ */
+.dark {
+  --asfalto: #16181a;
+  --tinta: #eeefec;
+
+  --background: #131517;
+  --foreground: #e8e9e5;
+  --card: #1a1d20;
+  --card-foreground: #e8e9e5;
+  --popover: #1a1d20;
+  --popover-foreground: #e8e9e5;
+
+  --primary: #3d9b82;
+  --primary-foreground: #0d1114;
+  --secondary: #23272a;
+  --secondary-foreground: #e8e9e5;
+
+  --muted: #1f2225;
+  --muted-foreground: #9aa1a6;
+  --accent: #23272a;
+  --accent-foreground: #e8e9e5;
+
+  --destructive: #d4614a;
+  --destructive-foreground: #14100f;
+
+  --border: color-mix(in oklab, #e8e9e5 14%, transparent);
+  --input: color-mix(in oklab, #e8e9e5 20%, transparent);
+  --ring: #3d9b82;
+
+  --urgente: #d4614a;
+  --atencion: #e09a45;
+  --resuelto: #9aa1a6;
+
+  /* Rampa oscura: **escalonada para la superficie oscura, no la clara
+     invertida**. Validada aparte contra #1a1d20. */
+  --serie-1: #2a5c50;
+  --serie-2: #377465;
+  --serie-3: #478e7c;
+  --serie-4: #5aa894;
+  --serie-5: #74c2ad;
+  --serie-6: #93dbc7;
 }
 
-/* Piso de calidad: el foco de teclado se ve siempre. */
-:focus-visible {
-  outline: 2px solid var(--color-verde);
-  outline-offset: 2px;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-serie-1: var(--serie-1);
+  --color-serie-2: var(--serie-2);
+  --color-serie-3: var(--serie-3);
+  --color-serie-4: var(--serie-4);
+  --color-serie-5: var(--serie-5);
+  --color-serie-6: var(--serie-6);
+
+  --color-urgente: var(--urgente);
+  --color-atencion: var(--atencion);
+  --color-resuelto: var(--resuelto);
+
+  /* Nombres literales, no `var(--font-sans)`: `@theme inline` resuelve las
+     variables al analizar el CSS, no en ejecucion, asi que una referencia a si
+     misma se queda en nada y la fuente no carga. */
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", monospace;
+
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: calc(var(--radius) * 0.875);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
 }
 
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* Las cifras del tablero —distancias, cuantos reportan— se comparan en
+       columna. Sin esto bailan al actualizarse. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Piso de calidad: el foco de teclado se ve siempre, en los dos temas. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Movimiento con intencion, pero **nada que estorbe al trabajo**. Quien mira
+ * esto ocho horas no puede esperar a que algo termine de aparecer.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

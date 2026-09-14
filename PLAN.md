@@ -87,6 +87,8 @@ arranque, volver a consultarlas: este archivo envejece.
 | Estado de servidor | TanStack Query | 5.10 |
 | Validación | Zod | 4.6 |
 | Mapa | MapLibre GL | 6.9 |
+| Componentes | shadcn/ui (Radix) | CLI 4.21 |
+| Movimiento | motion | 13.3 |
 | Backend | FastAPI | 0.141 |
 | ORM y migraciones | SQLAlchemy + Alembic | 2.0 / 1.20 |
 | Base | PostgreSQL + PostGIS | 17 / 3.5+ |
@@ -288,11 +290,23 @@ señalización, cono de obra. Nada de azul corporativo ni de generador de temas.
 --gris    #7a8288   resuelto
 ```
 
-**Superficie clara.** Es una herramienta de escritorio que alguien mira ocho
-horas con luz de oficina, no una demo para una captura.
+**Superficie clara por defecto, oscura disponible.** Es una herramienta de
+escritorio que alguien mira ocho horas con luz de oficina, y por eso el claro
+manda. Pero el tema oscuro sale casi gratis con tokens, y para una demo pesa.
 
-**Sin kit de componentes.** Uno resuelve rápido y hace que el proyecto se vea
-como los otros mil que usan el mismo kit.
+**Con kit de componentes: shadcn/ui.** ~~Sin kit de componentes: uno resuelve
+rápido y hace que el proyecto se vea como los otros mil que usan el mismo kit.~~
+
+**Revertido el 2026-09-14, con motivo nuevo.** La decisión original protegía la
+identidad visual, y el argumento sigue siendo cierto. Pero pesa más otro: **esto
+es un proyecto de demostración, y uno que no impresiona no cumple su función.**
+Un tablero austero se defiende ante quien ya entiende el problema; ante quien lo
+ve por primera vez, pierde.
+
+Lo que se conserva de la decisión vieja: **la paleta y la tipografía son
+propias**, encima del kit. shadcn resuelve el comportamiento y la accesibilidad;
+el aspecto sigue saliendo del material del problema. Eso es lo que evita que se
+vea como los otros mil.
 
 **El color significa una cosa sola.** El ámbar es atención y nada más, así que
 donde aparezca quiere decir «mirá esto». Un color que se usa de adorno deja de
@@ -302,8 +316,14 @@ poder usarse como señal.
 puntos iguales tira a la basura la información de dónde se concentra el
 reclamo.
 
-**Movimiento solo donde muestra un cambio:** un reporte que entra a la cola, un
-caso que cambia de estado. Nada que aparezca con desvanecido al hacer scroll.
+**Movimiento con intención.** ~~Solo donde muestra un cambio.~~ Revertido el
+mismo día y por el mismo motivo: la fluidez es parte de lo que hace que algo se
+vea terminado.
+
+Se mantiene el límite que sí importa: **nada que estorbe al trabajo**. Las
+transiciones son cortas, no bloquean la interacción, y `prefers-reduced-motion`
+las apaga todas. Un operador que mira esto ocho horas no puede esperar a que
+algo termine de aparecer.
 
 **Piso de calidad, sin el cual la fase de interfaz no está terminada:** foco de
 teclado visible, `prefers-reduced-motion`, contraste comprobado a plena luz, y

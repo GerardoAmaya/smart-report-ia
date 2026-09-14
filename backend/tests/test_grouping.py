@@ -331,3 +331,61 @@ def test_palabras_vacias_no_inflan_el_parecido(session):
 def test_texto_ausente_no_suma(session):
     assert grouping.text_similarity(None, "hueco") == 0.0
     assert grouping.text_similarity("", "") == 0.0
+
+
+def test_la_severidad_del_caso_es_la_peor_de_sus_reportes(session):
+    """Si alguien añade "ya se cayo una moto", el caso es urgente.
+
+    La cola ordena por severidad; dejar la del primer reporte esconderia lo que
+    hay que atender antes.
+    """
+    from app.models import Classification
+
+    leve = crear_reporte(session)
+    session.execute(
+        Classification.__table__.update()
+        .where(Classification.report_id == leve.id)
+        .values(final_severity="baja")
+    )
+    session.commit()
+    agrupar(session, leve)
+    session.refresh(leve)
+    caso = session.get(Case, leve.case_id)
+    assert caso.severity == "baja"
+
+    p = desplazar(10)
+    grave = crear_reporte(session, lat=p[0], lon=p[1], usuario="2")
+    agrupar(session, grave)
+
+    session.refresh(caso)
+    assert caso.severity == "media", "la severidad sube con el reporte mas grave"
+
+
+def test_la_severidad_no_baja_al_entrar_uno_leve(session):
+    """Un reporte leve no rebaja un caso urgente."""
+    from app.models import Classification
+
+    grave = crear_reporte(session)
+    session.execute(
+        Classification.__table__.update()
+        .where(Classification.report_id == grave.id)
+        .values(final_severity="alta")
+    )
+    session.commit()
+    agrupar(session, grave)
+    session.refresh(grave)
+    caso = session.get(Case, grave.case_id)
+    assert caso.severity == "alta"
+
+    p = desplazar(10)
+    leve = crear_reporte(session, lat=p[0], lon=p[1], usuario="2")
+    session.execute(
+        Classification.__table__.update()
+        .where(Classification.report_id == leve.id)
+        .values(final_severity="baja")
+    )
+    session.commit()
+    agrupar(session, leve)
+
+    session.refresh(caso)
+    assert caso.severity == "alta"

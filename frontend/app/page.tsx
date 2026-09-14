@@ -1,122 +1,167 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+/**
+ * El tablero.
+ *
+ * Cola a la izquierda, detalle a la derecha, y el mapa como otra vista del
+ * mismo panel. No en paginas separadas: quien despacha vive en la cola, y
+ * mandarlo a otra pagina por cada caso le hace perder el sitio cada vez.
+ */
+import { useTheme } from "next-themes";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { ChartNoAxesCombined, List, LogOut, Map as MapIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { api } from "@/lib/api";
+import { useSesion } from "@/lib/sesion";
+import { CambiarTema } from "@/componentes/CambiarTema";
+import { Cola } from "@/componentes/Cola";
+import { Detalle } from "@/componentes/Detalle";
+import { Fallo } from "@/componentes/Estados";
+import { Metricas } from "@/componentes/Metricas";
 
-type Check = {
-  ok: boolean;
-  detail: string | null;
-  version?: string | null;
-  applied_revision?: string | null;
-  expected_revision?: string | null;
-  cached?: boolean;
-};
+// El mapa solo en el navegador: MapLibre toca `window` al cargarse y romperia
+// el render del servidor.
+const Mapa = dynamic(() => import("@/componentes/Mapa").then((m) => m.Mapa), {
+  ssr: false,
+  loading: () => <Skeleton className="h-full w-full rounded-none" />,
+});
 
-type Health = {
-  status: "ok" | "degraded";
-  environment: string;
-  schema_revision: string | null;
-  checks: Record<string, Check>;
-  issues: string[];
-};
+type Vista = "resumen" | "detalle" | "mapa";
 
-const LABELS: Record<string, string> = {
-  postgis: "PostGIS",
-  schema: "Esquema",
-  model: "Modelo",
-};
-
-export default function Page() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const response = await fetch(`${API_URL}/health`, { cache: "no-store", signal });
-      const body = (await response.json()) as Health;
-      if (signal?.aborted) return;
-      setHealth(body);
-      setError(null);
-    } catch {
-      // Abortar al desmontar no es un fallo del servicio: sin esta guarda, el
-      // panel escribiria "sin respuesta" justo al salir de la pagina.
-      if (signal?.aborted) return;
-      // La API caida no es lo mismo que la API degradada, y se dice distinto.
-      setHealth(null);
-      setError(`Sin respuesta de ${API_URL}`);
-    }
-  }, []);
+export default function Tablero() {
+  const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const { perfil, cargando, sinSesion, error } = useSesion();
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState("");
+  const [vista, setVista] = useState<Vista>("resumen");
 
   useEffect(() => {
-    const controller = new AbortController();
-    // Sondear un sistema externo es justo para lo que sirve un efecto. La regla
-    // no distingue que load es asincrono y que el setState ocurre despues del
-    // await, no en el cuerpo del efecto.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(controller.signal);
-    const timer = setInterval(() => load(controller.signal), 10_000);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [load]);
+    if (sinSesion) router.replace("/entrar");
+  }, [sinSesion, router]);
+
+  if (cargando) {
+    return (
+      <div className="flex h-screen flex-col">
+        <div className="border-b px-5 py-3">
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="flex flex-1">
+          <div className="w-[360px] border-r p-4">
+            <Skeleton className="h-full w-full" />
+          </div>
+          <div className="flex-1 p-6">
+            <Skeleton className="h-full w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <main className="flex h-screen items-center justify-center">
+        <Fallo mensaje={error} />
+      </main>
+    );
+  }
+  if (!perfil) return null;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <p className="text-xs uppercase tracking-[0.2em] text-gris">Fase 0 &middot; Esqueleto</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Smart Report</h1>
-      <p className="mt-2 text-sm text-gris">
-        Estado real del servicio, leido de <code>/health</code> cada diez segundos.
-      </p>
+    <div className="flex h-screen flex-col overflow-hidden">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold tracking-tight">Smart Report</span>
+          <Separator orientation="vertical" className="h-4" />
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            Reportes de la vía pública
+          </span>
+        </div>
 
-      <section className="mt-10 border border-tinta/10 bg-white">
-        <header className="flex items-baseline justify-between border-b border-tinta/10 px-5 py-4">
-          <span className="text-sm font-medium">Servicio</span>
-          <StatusText status={error ? "down" : health?.status} />
-        </header>
+        <Tabs value={vista} onValueChange={(v) => setVista(v as Vista)}>
+          <TabsList className="h-8">
+            <TabsTrigger value="resumen" className="gap-1.5 text-xs">
+              <ChartNoAxesCombined className="size-3.5" />
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger value="detalle" className="gap-1.5 text-xs">
+              <List className="size-3.5" />
+              Caso
+            </TabsTrigger>
+            <TabsTrigger value="mapa" className="gap-1.5 text-xs">
+              <MapIcon className="size-3.5" />
+              Mapa
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {error && <p className="px-5 py-4 text-sm text-rojo">{error}</p>}
+        <div className="flex items-center gap-1">
+          <span className="hidden text-xs text-muted-foreground md:inline">
+            {perfil.display_name ?? perfil.email}
+            {perfil.role === "demo" && " · prueba"}
+          </span>
+          <CambiarTema />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Salir"
+                onClick={async () => {
+                  await api.salir();
+                  router.push("/entrar");
+                }}
+              >
+                <LogOut className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Salir</TooltipContent>
+          </Tooltip>
+        </div>
+      </header>
 
-        {health && (
-          <dl className="divide-y divide-tinta/10">
-            {Object.entries(health.checks).map(([name, check]) => (
-              <div key={name} className="flex items-baseline justify-between gap-4 px-5 py-4">
-                <dt className="text-sm">{LABELS[name] ?? name}</dt>
-                <dd className="text-right text-sm">
-                  <span className={check.ok ? "text-verde" : "text-rojo"}>
-                    {check.ok ? "en linea" : "caido"}
-                  </span>
-                  <span className="ml-3 text-gris">{describe(name, check)}</span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </section>
+      <div className="flex min-h-0 flex-1">
+        <aside className="w-[360px] shrink-0 border-r">
+          <Cola
+            seleccionado={seleccionado}
+            onElegir={(id) => {
+              setSeleccionado(id);
+              setVista("detalle");
+            }}
+            filtro={filtro}
+            onFiltrar={setFiltro}
+          />
+        </aside>
 
-      {health && (
-        <p className="mt-4 text-xs text-gris">
-          entorno {health.environment} &middot; esquema {health.schema_revision ?? "sin migrar"}
-        </p>
-      )}
-    </main>
+        <main className="min-w-0 flex-1 overflow-hidden">
+          {vista === "mapa" && (
+            <Mapa
+              seleccionado={seleccionado}
+              onElegir={(id) => {
+                setSeleccionado(id);
+                setVista("detalle");
+              }}
+              oscuro={resolvedTheme === "dark"}
+            />
+          )}
+          {vista === "resumen" && (
+            <div className="h-full overflow-y-auto">
+              <Metricas />
+            </div>
+          )}
+          {vista === "detalle" && (
+            <div className="h-full overflow-y-auto">
+              <Detalle casoId={seleccionado} />
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
   );
-}
-
-function StatusText({ status }: { status?: "ok" | "degraded" | "down" }) {
-  if (status === "ok") return <span className="text-sm text-verde">operativo</span>;
-  if (status === "degraded") return <span className="text-sm text-rojo">degradado</span>;
-  if (status === "down") return <span className="text-sm text-rojo">sin respuesta</span>;
-  return <span className="text-sm text-gris">consultando</span>;
-}
-
-// El detalle del fallo se muestra entero: un estado rojo sin motivo obliga a
-// ir a los logs, que es justo lo que este panel deberia ahorrar.
-function describe(name: string, check: Check): string {
-  if (!check.ok) return check.detail ?? "";
-  if (name === "postgis") return check.version ?? "";
-  if (name === "schema") return check.applied_revision ?? "";
-  if (name === "model") return check.cached ? "cacheado" : "recien sondeado";
-  return "";
 }

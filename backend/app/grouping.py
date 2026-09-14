@@ -369,6 +369,31 @@ def _recalcular(session: Session, caso: Case) -> None:
         ),
         {"cid": caso.id},
     )
+    # La severidad del caso es **la mas alta de sus reportes**, no la del
+    # primero. Si alguien añade "ya se cayo una moto" a un caso que empezo
+    # leve, el caso es urgente: la cola ordena por esto y dejarlo en la
+    # severidad inicial esconderia lo que hay que atender antes.
+    session.execute(
+        text(
+            """
+            UPDATE cases SET severity = sub.peor
+            FROM (
+                SELECT CASE
+                         WHEN bool_or(c.final_severity = 'alta')  THEN 'alta'
+                         WHEN bool_or(c.final_severity = 'media') THEN 'media'
+                         WHEN bool_or(c.final_severity = 'baja')  THEN 'baja'
+                         ELSE NULL
+                       END AS peor
+                FROM reports r
+                JOIN classifications c ON c.report_id = r.id
+                WHERE r.case_id = :cid AND c.final_severity IS NOT NULL
+            ) AS sub
+            WHERE cases.id = :cid AND sub.peor IS NOT NULL
+            """
+        ),
+        {"cid": caso.id},
+    )
+
     # El objeto en memoria quedo viejo tras el UPDATE directo.
     session.expire(caso)
 

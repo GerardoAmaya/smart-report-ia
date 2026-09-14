@@ -165,6 +165,77 @@ def test_el_aviso_habla_del_reporte_y_no_del_caso(session):
     assert "Se bacheo el tramo." in texto
 
 
+def test_el_aviso_dice_cual_reporte_es(session):
+    """La categoria sola no distingue dos reportes de la misma persona.
+
+    Quien reporto dos fugas en la misma semana recibia dos veces "tu reporte
+    sobre el agua o drenaje" y no podia saber cual se movio.
+    """
+    from datetime import UTC, datetime
+
+    caso = Case(category="agua", status="assigned")
+    session.add(caso)
+    session.flush()
+    reporte = Report(
+        channel="telegram",
+        external_user_id="777",
+        status="received",
+        case_id=caso.id,
+        created_at=datetime(2026, 9, 14, 23, 18, tzinfo=UTC),
+        location="SRID=4326;POINT(-89.238082 13.685892)",
+    )
+    session.add(reporte)
+    session.commit()
+
+    texto = dispatch.mensaje(caso, "assigned", None, reporte, session)
+
+    # Cuando: en hora de El Salvador, que son seis menos que UTC.
+    assert "lunes 14 de septiembre" in texto
+    assert "5:18 p. m." in texto
+    # Donde: el punto exacto que recibio la cuadrilla.
+    assert "13.685892,-89.238082" in texto
+    # El enlace termina el mensaje: un punto detras se lo traga Telegram
+    # dentro del enlace y el mapa abre en un sitio que no existe.
+    assert not texto.rstrip().endswith(".")
+    # Sigue sin hablar del caso.
+    assert "caso" not in texto.lower()
+
+
+def test_cada_quien_recibe_las_señas_de_su_propio_reporte(session):
+    """Dos personas en el mismo caso reportaron desde sitios distintos."""
+    from datetime import UTC, datetime
+
+    caso = Case(category="agua", status="assigned")
+    session.add(caso)
+    session.flush()
+    for usuario, dia, lon in (("801", 10, -89.20), ("802", 12, -89.21)):
+        session.add(
+            Report(
+                channel="telegram",
+                external_user_id=usuario,
+                status="received",
+                case_id=caso.id,
+                created_at=datetime(2026, 9, dia, 18, 0, tzinfo=UTC),
+                location=f"SRID=4326;POINT({lon} 13.70)",
+            )
+        )
+    session.commit()
+
+    dispatch.enqueue(session, caso, "assigned")
+    session.commit()
+
+    cuerpos = {
+        n.external_user_id: n.body
+        for n in session.execute(select(Notification).where(Notification.case_id == caso.id))
+        .scalars()
+        .all()
+    }
+    assert "-89.200000" in cuerpos["801"]
+    assert "-89.210000" in cuerpos["802"]
+    assert "10 de septiembre" in cuerpos["801"]
+    assert "12 de septiembre" in cuerpos["802"]
+
+
 # --- Cerrar exige evidencia ---
 
 

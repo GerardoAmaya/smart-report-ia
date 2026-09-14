@@ -279,6 +279,24 @@ ignorar.
 **El mensaje habla del reporte, no del caso.** Quien reporto un hueco no sabe
 que existe un caso ni por que su foto esta junto a otras tres.
 
+**Y dice cual de sus reportes es: cuando lo mando y donde.** La categoria sola
+no lo distingue —quien reporto dos fugas en la misma semana recibe dos veces
+«tu reporte sobre el agua o drenaje»—, asi que el texto se arma por persona con
+las señas de **su** reporte, no del caso. La hora va en la de El Salvador y los
+nombres de dia y mes estan escritos en el codigo: el contenedor no trae la
+configuracion regional en español y `strftime("%A")` devolveria «Sunday» sin
+avisar.
+
+**El sitio se enseña como punto, no como direccion.** De la ubicacion solo
+llegan coordenadas; traducirlas a nombre de calle pide un servicio de
+geocodificacion que no existe en el sistema, y una calle inventada es peor que
+ninguna. El enlace abre el punto exacto que recibio la cuadrilla. Si algun dia
+se quiere la direccion escrita, es geocodificacion inversa con su columna
+cacheada, no una llamada por aviso.
+
+**El enlace va al final y sin punto detras.** Telegram se traga el punto dentro
+del enlace y el mapa abre en un sitio que no existe. Hay una prueba que lo fija.
+
 **La evidencia va en `case_photos`, no en `report_photos.kind='evidence'`.**
 La fase 2 anticipo lo segundo y la anticipacion estaba mal: una foto de arreglo
 la sube un operador, no se clasifica, no se le saca huella, y no puede entrar en

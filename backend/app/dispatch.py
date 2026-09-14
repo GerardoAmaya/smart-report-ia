@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from geoalchemy2 import Geometry
+from sqlalchemy import cast, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,28 @@ from app.models import Case, Crew, Notification, Report
 from app.taxonomy import Category
 
 log = logging.getLogger("smart_report.dispatch")
+
+# La hora se le enseña a quien reporto, asi que va en la suya y no en UTC.
+ZONA = ZoneInfo("America/El_Salvador")
+
+# Los nombres se escriben aqui y no con `locale`: el contenedor no trae
+# instalada la configuracion regional en español, y `strftime("%A")` devolveria
+# "Sunday" sin avisar de nada.
+DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+MESES = (
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+)
 
 ETIQUETA_CATEGORIA: dict[str, str] = {
     Category.VIALIDAD: "la calle o acera",
@@ -39,39 +63,106 @@ def _cosa(caso: Case) -> str:
     return ETIQUETA_CATEGORIA.get(caso.category or "", "lo que reportaste")
 
 
-def mensaje(caso: Case, kind: str, crew: Crew | None = None) -> str:
+def _cuando(momento: datetime) -> str:
+    """«el domingo 14 de septiembre, 5:43 p. m.», en hora de El Salvador."""
+    local = momento.astimezone(ZONA)
+    hora = local.hour % 12 or 12
+    franja = "a. m." if local.hour < 12 else "p. m."
+    return (
+        f"el {DIAS[local.weekday()]} {local.day} de {MESES[local.month - 1]}, "
+        f"{hora}:{local.minute:02d} {franja}"
+    )
+
+
+def sitio(reporte: Report | None, session: Session | None = None) -> str:
+    """Las señas del reporte de esa persona: cuando lo mando y donde.
+
+    Quien reporto necesita saber **cual** de sus reportes se movio, y la
+    categoria sola no se lo dice: alguien que reporto dos fugas en la misma
+    semana recibe dos veces "tu reporte sobre el agua o drenaje". La fecha lo
+    distingue y el punto lo confirma.
+
+    No se pone una direccion porque no la tenemos: de la ubicacion solo llegan
+    coordenadas, y traducirlas a calle pide un servicio de geocodificacion que
+    hoy no existe en el sistema. El enlace enseña el punto exacto —el mismo que
+    recibio la cuadrilla— sin inventarse un nombre de calle que podria estar mal.
+    """
+    if reporte is None:
+        return ""
+
+    señas = f"Es el que mandaste {_cuando(reporte.created_at)}"
+
+    if session is not None and reporte.location is not None:
+        punto = session.execute(
+            select(
+                func.ST_Y(cast(Report.location, Geometry)),
+                func.ST_X(cast(Report.location, Geometry)),
+            ).where(Report.id == reporte.id)
+        ).first()
+        if punto and punto[0] is not None:
+            lat, lon = punto
+            señas += f"\nEste es el punto: https://maps.google.com/?q={lat:.6f},{lon:.6f}"
+
+    return señas
+
+
+def mensaje(
+    caso: Case,
+    kind: str,
+    crew: Crew | None = None,
+    reporte: Report | None = None,
+    session: Session | None = None,
+) -> str:
     """Lo que le llega a quien reporto.
 
     Se le habla de **su** reporte, no del caso: quien reporto un hueco no sabe
     que existe un "caso 4f2a" ni por que su foto esta junto a otras tres. El
     agrupamiento es un detalle del sistema, no de su problema.
     """
+    señas = sitio(reporte, session)
+    cola = f"\n\n{señas}" if señas else ""
+
     if kind == "assigned":
         quien = f" a {crew.name}" if crew else ""
         return (
-            f"Tu reporte sobre {_cosa(caso)} ya fue asignado{quien}. Te aviso cuando este resuelto."
+            f"Tu reporte sobre {_cosa(caso)} ya fue asignado{quien}. "
+            f"Te aviso cuando esté resuelto.{cola}"
         )
     if kind == "in_progress":
-        return f"Ya estan trabajando en lo que reportaste sobre {_cosa(caso)}."
+        return f"Ya están trabajando en lo que reportaste sobre {_cosa(caso)}.{cola}"
     if kind == "closed":
-        base = f"Lo que reportaste sobre {_cosa(caso)} quedo resuelto."
+        base = f"Lo que reportaste sobre {_cosa(caso)} quedó resuelto."
         if caso.closing_note:
             base += f"\n\n{caso.closing_note}"
-        return base + "\n\nGracias por reportarlo."
-    return "Hubo un cambio en lo que reportaste."
+        return base + cola + "\n\nGracias por reportarlo."
+    return f"Hubo un cambio en lo que reportaste.{cola}"
 
 
-def destinatarios(session: Session, caso: Case) -> list[tuple[str, str]]:
-    """Quienes reportaron este caso, **sin repetir**.
+def destinatarios(session: Session, caso: Case) -> list[tuple[str, str, Report]]:
+    """Quienes reportaron este caso, **sin repetir**, con su propio reporte.
 
     Distintos por (canal, usuario): alguien que reporto el mismo hueco tres
     veces recibe un aviso, no tres. Quien mas reporta no puede acabar mas
     molestado por el sistema.
+
+    Va el reporte y no solo el identificador porque el aviso habla de **su**
+    reporte: de los tres que mando, el primero, que es el que tiene la foto que
+    abrio el caso.
     """
-    filas = session.execute(
-        select(Report.channel, Report.external_user_id).where(Report.case_id == caso.id).distinct()
-    ).all()
-    return [(c, u) for c, u in filas]
+    filas = (
+        session.execute(
+            select(Report)
+            .where(Report.case_id == caso.id)
+            .order_by(Report.channel, Report.external_user_id, Report.created_at)
+        )
+        .scalars()
+        .all()
+    )
+
+    primero: dict[tuple[str, str], Report] = {}
+    for r in filas:
+        primero.setdefault((r.channel, r.external_user_id), r)
+    return [(canal, usuario, r) for (canal, usuario), r in primero.items()]
 
 
 def enqueue(session: Session, caso: Case, kind: str, crew: Crew | None = None) -> int:
@@ -81,10 +172,10 @@ def enqueue(session: Session, caso: Case, kind: str, crew: Crew | None = None) -
     alguien reabre y vuelve a cerrar el caso, no se reenvia el mismo aviso. Un
     sistema que avisa dos veces de lo mismo se aprende a ignorar.
     """
-    texto = mensaje(caso, kind, crew)
     nuevos = 0
 
-    for canal, usuario in destinatarios(session, caso):
+    for canal, usuario, reporte in destinatarios(session, caso):
+        # El texto se arma por persona: lleva las señas de su propio reporte.
         resultado = session.execute(
             insert(Notification)
             .values(
@@ -92,7 +183,7 @@ def enqueue(session: Session, caso: Case, kind: str, crew: Crew | None = None) -
                 channel=canal,
                 external_user_id=usuario,
                 kind=kind,
-                body=texto,
+                body=mensaje(caso, kind, crew, reporte, session),
                 status="pending",
             )
             .on_conflict_do_nothing(constraint="uq_notifications_destinatario")

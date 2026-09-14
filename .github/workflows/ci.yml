@@ -41,21 +41,25 @@ jobs:
         # MinIO como paso y no como service: la imagen pide el argumento
         # "server", y services no deja cambiar el comando comodamente. Sin esto
         # la fase 2 no tendria cobertura en CI, que es donde importa.
+        #
+        # **No se crea el bucket aqui.** La suite crea el suyo —con sufijo
+        # -test, porque el almacenamiento tambien esta aislado— asi que un paso
+        # que lo creara seria una pieza de mas que puede fallar. Ya fallo: se
+        # invocaba `mc` con `/bin/sh -c`, y como `mc` es el entrypoint de esa
+        # imagen, recibia "/bin/sh" como subcomando y reventaba.
         run: |
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=smart_report_minio \
             -e MINIO_ROOT_PASSWORD=smart_report_minio_dev_only \
             quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+
+          # Esperar a que conteste, no a que el contenedor exista: arrancado no
+          # es lo mismo que listo, y la primera prueba fallaria por carrera.
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live && break
             sleep 2
           done
-          docker run --rm --network host quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
-            /bin/sh -c "
-              mc alias set local http://localhost:9000 smart_report_minio smart_report_minio_dev_only &&
-              mc mb --ignore-existing local/smart-report-photos &&
-              mc anonymous set none local/smart-report-photos
-            "
+          curl -sf http://localhost:9000/minio/health/live
 
       - uses: actions/setup-python@v6
         with:

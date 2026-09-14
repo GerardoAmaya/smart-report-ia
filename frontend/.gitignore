@@ -1,0 +1,3 @@
+
+# Copiados desde node_modules en cada arranque; ver scripts/copiar-worker-maplibre.mjs
+public/maplibre/

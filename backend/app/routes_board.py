@@ -13,19 +13,24 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from geoalchemy2 import Geometry
 from sqlalchemy import case, cast, func, select, text
+from sqlalchemy.orm import Session as OrmSession
 
-from app import grouping, storage
+from app import dispatch, grouping, images, storage
 from app.auth import requiere
+from app.config import settings
 from app.db import SesionBD
 from app.models import (
     Case,
+    CasePhoto,
     Classification,
+    Crew,
     GroupingEvidence,
+    Notification,
     Report,
     ReportPhoto,
     User,
@@ -248,6 +253,28 @@ def detalle_del_caso(
             }
         )
 
+    crew = session.get(Crew, caso.crew_id) if caso.crew_id else None
+
+    evidencias = (
+        session.execute(
+            select(CasePhoto)
+            .where(CasePhoto.case_id == case_id, CasePhoto.deleted_at.is_(None))
+            .order_by(CasePhoto.created_at)
+        )
+        .scalars()
+        .all()
+    )
+
+    # Cuantos avisos salieron y a cuantos les llego. Se enseña porque es la
+    # parte que casi nadie construye: si no se ve, nadie sabe que existe.
+    avisos = dict(
+        session.execute(
+            select(Notification.status, func.count(Notification.id))
+            .where(Notification.case_id == case_id)
+            .group_by(Notification.status)
+        ).all()
+    )
+
     return {
         "id": str(caso.id),
         "status": caso.status,
@@ -255,6 +282,25 @@ def detalle_del_caso(
         "severity": caso.severity,
         "report_count": caso.report_count,
         "created_at": caso.created_at.isoformat(),
+        "crew": {"id": str(crew.id), "name": crew.name} if crew else None,
+        "assigned_at": caso.assigned_at.isoformat() if caso.assigned_at else None,
+        "closed_at": caso.closed_at.isoformat() if caso.closed_at else None,
+        "closing_note": caso.closing_note,
+        "evidence": [
+            {
+                "id": str(f.id),
+                "thumbnail_url": _url_de_foto(f.thumbnail_key),
+                "original_url": _url_de_foto(f.storage_key),
+                "uploaded_by": f.uploaded_by,
+                "created_at": f.created_at.isoformat(),
+            }
+            for f in evidencias
+        ],
+        "notifications": {
+            "sent": avisos.get("sent", 0),
+            "pending": avisos.get("pending", 0) + avisos.get("processing", 0),
+            "failed": avisos.get("failed", 0),
+        },
         "reports": salida,
     }
 
@@ -407,3 +453,144 @@ def metricas(
         "dudosos": dudosos,
         "costo_usd": float(costo or 0),
     }
+
+
+# --- Despacho y cierre ---
+
+
+@router.get("/crews")
+def listar_cuadrillas(usuario: Ver, session: SesionBD) -> dict:
+    filas = (
+        session.execute(select(Crew).where(Crew.is_active.is_(True)).order_by(Crew.name))
+        .scalars()
+        .all()
+    )
+    return {"crews": [{"id": str(c.id), "name": c.name, "notes": c.notes} for c in filas]}
+
+
+@router.post("/cases/{case_id}/assign")
+def asignar(
+    case_id: UUID,
+    usuario: Despachar,
+    session: SesionBD,
+    crew_id: Annotated[UUID, Query()],
+) -> dict:
+    """Asigna el caso a una cuadrilla y **avisa a todos los que reportaron**."""
+    caso = _caso_o_404(session, case_id)
+    crew = session.get(Crew, crew_id)
+    if crew is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no existe esa cuadrilla")
+
+    try:
+        avisados = dispatch.assign(session, caso, crew)
+    except dispatch.NoSePuede as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    session.commit()
+    return {"ok": True, "status": caso.status, "crew": crew.name, "avisados": avisados}
+
+
+@router.post("/cases/{case_id}/start")
+def empezar(case_id: UUID, usuario: Despachar, session: SesionBD) -> dict:
+    caso = _caso_o_404(session, case_id)
+    try:
+        avisados = dispatch.start(session, caso)
+    except dispatch.NoSePuede as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    session.commit()
+    return {"ok": True, "status": caso.status, "avisados": avisados}
+
+
+@router.post("/cases/{case_id}/evidence")
+async def subir_evidencia(
+    case_id: UUID,
+    usuario: Despachar,
+    session: SesionBD,
+    archivo: Annotated[UploadFile, File()],
+) -> dict:
+    """La foto del arreglo.
+
+    Se valida abriendola, igual que las de reporte: un archivo con cabecera JPEG
+    y basura detras pasa cualquier numero magico y revienta despues.
+    """
+    caso = _caso_o_404(session, case_id)
+
+    datos = await archivo.read()
+    if len(datos) > settings.max_photo_bytes:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"la foto pasa de {settings.max_photo_bytes // 1024 // 1024} MB",
+        )
+    try:
+        validada = images.validate(datos)
+    except images.ImagenInvalida as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    foto_id = uuid4()
+    clave = storage.build_key(caso.id, foto_id, kind="evidencia", ext=validada.extension)
+    guardado = storage.put(clave, datos, validada.mime)
+
+    miniatura = images.thumbnail(datos)
+    clave_min = storage.build_key(caso.id, foto_id, kind="evidencia-thumb", ext="jpg")
+    guardada_min = storage.put(clave_min, miniatura, "image/jpeg")
+
+    session.add(
+        CasePhoto(
+            id=foto_id,
+            case_id=caso.id,
+            uploaded_by=usuario.email,
+            storage_key=guardado.key,
+            thumbnail_key=guardada_min.key,
+            content_sha256=guardado.sha256,
+            bytes=guardado.bytes,
+            thumbnail_bytes=guardada_min.bytes,
+            width=validada.width,
+            height=validada.height,
+            mime_type=validada.mime,
+        )
+    )
+    session.commit()
+    return {"ok": True, "id": str(foto_id)}
+
+
+@router.post("/cases/{case_id}/close")
+def cerrar(
+    case_id: UUID,
+    usuario: Despachar,
+    session: SesionBD,
+    nota: Annotated[str | None, Query(max_length=500)] = None,
+) -> dict:
+    """Cierra el caso **con foto de evidencia** y avisa a todos.
+
+    Sin foto no se cierra: cerrar sin evidencia convierte el cierre en una
+    afirmacion que nadie puede comprobar, y el tablero existe para que las
+    afirmaciones se puedan comprobar.
+    """
+    caso = _caso_o_404(session, case_id)
+    try:
+        avisados = dispatch.close(session, caso, nota)
+    except dispatch.NoSePuede as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    session.commit()
+    return {"ok": True, "status": caso.status, "avisados": avisados}
+
+
+@router.post("/cases/{case_id}/reopen")
+def reabrir(case_id: UUID, usuario: Despachar, session: SesionBD) -> dict:
+    caso = _caso_o_404(session, case_id)
+    try:
+        dispatch.reopen(session, caso)
+    except dispatch.NoSePuede as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    session.commit()
+    return {"ok": True, "status": caso.status}
+
+
+def _caso_o_404(session: OrmSession, case_id: UUID) -> Case:
+    caso = session.get(Case, case_id)
+    if caso is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no existe ese caso")
+    return caso

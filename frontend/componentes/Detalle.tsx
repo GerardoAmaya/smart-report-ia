@@ -27,17 +27,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { api, type Reporte } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { categoria, hace, metros } from "@/lib/textos";
 import { puede, useSesion } from "@/lib/sesion";
+import { Despacho } from "./Despacho";
 import { CargandoDetalle, Fallo, Vacio } from "./Estados";
 import { Estado, Severidad } from "./Marcas";
 
@@ -61,10 +55,6 @@ export function Detalle({ casoId }: { casoId: string | null }) {
     onSuccess: refrescar,
   });
 
-  const cambiarEstado = useMutation({
-    mutationFn: (nuevo: string) => api.cambiarEstado(casoId!, nuevo),
-    onSuccess: refrescar,
-  });
 
   if (!casoId) {
     return (
@@ -110,25 +100,9 @@ export function Detalle({ casoId }: { casoId: string | null }) {
           </div>
         </div>
 
-        {puedeDespachar && (
-          <div className="mt-4 flex items-center gap-2">
-            <Select value={data.status} onValueChange={(v) => cambiarEstado.mutate(v)}>
-              <SelectTrigger size="sm" className="w-[170px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">Sin atender</SelectItem>
-                <SelectItem value="assigned">Asignado</SelectItem>
-                <SelectItem value="in_progress">En curso</SelectItem>
-                <SelectItem value="closed">Cerrado</SelectItem>
-              </SelectContent>
-            </Select>
-            {cambiarEstado.isPending && (
-              <span className="text-xs text-muted-foreground">Guardando…</span>
-            )}
-          </div>
-        )}
       </header>
+
+      {puedeDespachar && <Despacho caso={data} />}
 
       <Separator className="my-6" />
 

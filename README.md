@@ -6,9 +6,10 @@ cuadrilla lo ve agrupado con los otros tres que reportaron lo mismo.
 
 El alcance, las fases y las decisiones ya tomadas están en [`PLAN.md`](PLAN.md).
 
-**Estado: fase 4 — agrupación.** El bot recibe foto y ubicación, guarda las
-fotos, propone categoría con el modelo, la persona confirma, y el código agrupa
-los reportes del mismo problema.
+**Estado: fase 6 — despacho y cierre.** El bot recibe foto y ubicación,
+guarda las fotos, propone categoría, la persona confirma, el código agrupa,
+y el tablero asigna cuadrillas, cierra con foto de evidencia y **avisa de
+vuelta a todos los que reportaron**.
 
 ---
 
@@ -379,6 +380,40 @@ no acierto.
 Las dos tasas van **por separado, nunca promediadas**: un sistema que junta todo
 y otro que no junta nada darían un promedio parecido, y uno de los dos esconde
 problemas.
+
+## Despacho y cierre
+
+La parte que casi nadie construye: **avisarle de vuelta a todos los que
+reportaron, no solo al primero.** Sin eso nadie reporta dos veces. Y es lo que
+le da sentido al agrupamiento más allá de ahorrar trabajo: permite responderle
+a cuatro personas con un solo arreglo.
+
+| Paso | Qué pasa |
+|---|---|
+| Asignar a una cuadrilla | Se avisa a todos: «tu reporte ya fue asignado» |
+| Marcar en curso | Se avisa: «ya están trabajando en lo que reportaste» |
+| Subir la foto del arreglo | Queda con quién la subió |
+| Cerrar | Se avisa a todos, con la nota del operador tal cual |
+
+**El aviso se encola, no se manda ahí mismo.** Si mandar cuatro mensajes viviera
+dentro de la petición que cierra el caso, un fallo en el cuarto dejaría el caso
+sin cerrar. El cierre es un hecho; avisarlo es un intento que se reintenta.
+
+**Un aviso por persona, no por reporte.** Quien reportó tres veces recibe uno, y
+reabrir y volver a cerrar no reenvía nada. Quien más reporta no puede acabar más
+molestado por el sistema.
+
+**El mensaje habla de *su* reporte, no del caso.** Quien reportó un hueco no
+sabe que existe un «caso 4f2a» ni por qué su foto está junto a otras tres. El
+agrupamiento es un detalle del sistema, no de su problema.
+
+**No se cierra sin foto del arreglo.** Un cierre sin evidencia es una afirmación
+que nadie puede comprobar, y el tablero existe para que las afirmaciones se
+puedan comprobar.
+
+Quien no se pueda recibir el mensaje —bloqueó al bot, borró la conversación— se
+marca como fallo permanente al primer intento. Reintentar eso es gastar cuota
+para llegar a la misma conclusión.
 
 ## `/health`
 

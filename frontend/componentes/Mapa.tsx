@@ -15,16 +15,27 @@
  */
 import { useQuery } from "@tanstack/react-query";
 // MapLibre 6 quito el export por defecto: ahora son exports nombrados.
-import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
+import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import { useEffect, useRef } from "react";
 
 import { api, type Punto } from "@/lib/api";
 import { categoria } from "@/lib/textos";
-import "maplibre-gl/dist/maplibre-gl.css";
 
 // San Salvador. Si no hay casos, el mapa tiene que abrir en algun sitio con
 // sentido y no en el Atlantico.
 const CENTRO: [number, number] = [-89.2182, 13.6929];
+
+/**
+ * El worker de MapLibre, servido desde `public/`.
+ *
+ * **Turbopack no lo emite**, asi que el mapa se monta y no pide una sola
+ * tesela: los pines se ven —son HTML— y el fondo no. No hay error en consola
+ * ni peticion fallida, que es lo que lo vuelve dificil de encontrar.
+ *
+ * Los copia `scripts/copiar-worker-maplibre.mjs` antes de cada `dev` y `build`.
+ * Se registra **antes de construir ningun mapa**: despues no tiene efecto.
+ */
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 const ESTILO_CLARO = "https://tiles.openfreemap.org/styles/positron";
 const ESTILO_OSCURO = "https://tiles.openfreemap.org/styles/dark";
@@ -54,6 +65,8 @@ export function Mapa({
   const contenedor = useRef<HTMLDivElement>(null);
   const mapa = useRef<MapLibreMap | null>(null);
   const marcadores = useRef<globalThis.Map<string, Marker>>(new globalThis.Map());
+  // El estilo con el que se creo, para no pisarlo al montar.
+  const estiloInicial = useRef(oscuro ? ESTILO_OSCURO : ESTILO_CLARO);
 
   const { data } = useQuery({
     queryKey: ["mapa"],
@@ -61,12 +74,16 @@ export function Mapa({
     refetchInterval: 15_000,
   });
 
+  // El mapa se crea **una sola vez**. Con `oscuro` en las dependencias, este
+  // efecto y el de abajo corrian los dos al montar: uno creaba el mapa con un
+  // estilo y el otro llamaba a setStyle encima, mientras el primero todavia
+  // cargaba. El estilo quedaba a medias y las fuentes sin inicializar.
   useEffect(() => {
     if (!contenedor.current || mapa.current) return;
 
     mapa.current = new MapLibreMap({
       container: contenedor.current,
-      style: oscuro ? ESTILO_OSCURO : ESTILO_CLARO,
+      style: estiloInicial.current,
       center: CENTRO,
       zoom: 12.5,
       attributionControl: { compact: true },
@@ -77,12 +94,17 @@ export function Mapa({
       mapa.current?.remove();
       mapa.current = null;
     };
-  }, [oscuro]);
+  }, []);
 
   // El estilo cambia con el tema sin rehacer el mapa: recrearlo perderia la
   // posicion y el zoom, que es lo que el operador acababa de ajustar.
   useEffect(() => {
-    mapa.current?.setStyle(oscuro ? ESTILO_OSCURO : ESTILO_CLARO);
+    const deseado = oscuro ? ESTILO_OSCURO : ESTILO_CLARO;
+    // No en el primer render: ahi ya se creo con el estilo correcto, y pisarlo
+    // es justo la carrera que rompia el mapa.
+    if (estiloInicial.current === deseado) return;
+    estiloInicial.current = deseado;
+    mapa.current?.setStyle(deseado);
   }, [oscuro]);
 
   useEffect(() => {

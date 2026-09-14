@@ -37,7 +37,8 @@ Este principio no se negocia: es lo que hace el sistema verificable.
 
 ## Estado
 
-**Fases 0, 1 y 2 cerradas y verificadas. Fases 3 y 4 escritas.** Lo que existe:
+**Fases 0, 1 y 2 cerradas y verificadas. Fases 3 a 6 escritas.** Lo que
+existe:
 
 - `InboundChannel` como contrato, con Telegram como primera implementación
 - Webhook con secreto, límites, tope de cuerpo y **cero llamadas de red salientes**
@@ -45,15 +46,28 @@ Este principio no se negocia: es lo que hace el sistema verificable.
 - Miniaturas, huella perceptual y retención que borra de verdad, huérfanos incluidos
 - Clasificación con salida por esquema y confirmación por botones en el bot
 - Agrupación por código con distancia PostGIS, evidencia escrita y deshacer
-- Trece migraciones, una por tabla, y seeders versionados aparte
-- 142 pruebas en verde
+- Tablero con cola, detalle, mapa y panel de métricas; entrada con Google y con
+  contraseña, y permisos comprobados en la API
+- Despacho: asignar cuadrilla, cerrar con foto de evidencia, y **aviso de
+  vuelta a todos los que reportaron**, encolado y con reintentos
+- Dieciocho migraciones, una por tabla, y seeders versionados aparte
+- 197 pruebas en verde y CI en verde
 
-**Las fases 3 y 4 no están cerradas:** sus verificaciones piden doscientas fotos
-etiquetadas y doscientos reportes agrupados a mano, y eso no existe todavía. El
-código para medirlo sí, y avisa cuando la muestra es insuficiente en vez de dar
-un número.
+**Las fases 3, 4 y 5 no están cerradas**, y cada una espera una verificación que
+no se puede fabricar:
 
-**Siguiente: fase 5 — el tablero.** Avisar antes de empezarla.
+| Fase | Le falta |
+|---|---|
+| 3 — clasificación | 200 fotos etiquetadas: exactitud por categoría y matriz de confusión |
+| 4 — agrupación | 200 reportes agrupados a mano: las dos tasas por separado |
+| 5 — el tablero | Alguien que no vio el sistema mira un caso agrupado y lo entiende solo |
+| 6 — despacho | El ciclo completo con un reporte real: de la foto al aviso de cerrado |
+
+El código que mide las tres existe y **avisa cuando la muestra no alcanza** en
+vez de dar un número. Las etiquetas de la fase 3 se juntan solas: cada
+confirmación en el bot es una.
+
+**Siguiente: fase 7 — tiempo real y pruebas extremo a extremo.**
 
 ## Decisiones tomadas
 
@@ -247,6 +261,46 @@ apunta» y los registros de desarrollo no están en la base de pruebas.
 bytes y después confirma la fila; sin margen, barrer durante esa ventana
 borraría una foto que estaba entrando. Sin este barrido, un objeto que perdió su
 fila queda fuera del alcance de la política para siempre.
+
+**El aviso de vuelta se encola, nunca se manda en la peticion.** El cierre es
+un hecho; avisarlo es un intento. Si mandar cuatro mensajes viviera dentro de la
+peticion que cierra el caso, un fallo en el cuarto dejaria el caso sin cerrar.
+
+**Un aviso por persona y por tipo, no por reporte.** Unico en (caso, canal,
+usuario, tipo). Quien reporto tres veces recibe uno, y reabrir y volver a cerrar
+no reenvia nada: un sistema que avisa dos veces de lo mismo se aprende a
+ignorar.
+
+**El mensaje habla del reporte, no del caso.** Quien reporto un hueco no sabe
+que existe un caso ni por que su foto esta junto a otras tres.
+
+**La evidencia va en `case_photos`, no en `report_photos.kind='evidence'`.**
+La fase 2 anticipo lo segundo y la anticipacion estaba mal: una foto de arreglo
+la sube un operador, no se clasifica, no se le saca huella, y no puede entrar en
+la agrupacion. Compartiendo tabla, olvidar un `WHERE kind='report'` una vez
+mete la foto del arreglo como si fuera otro reporte del problema.
+
+**No se cierra sin foto.** Un cierre sin evidencia es una afirmacion que nadie
+puede comprobar.
+
+**La retencion de la evidencia cuelga de `closed_at`, no de `updated_at`.** Un
+caso reabierto deja `closed_at` en nulo, asi que su foto vuelve a estar fuera de
+alcance mientras siga abierto.
+
+**El worker de MapLibre se sirve desde `public/`, no desde el bundle.**
+Turbopack no lo emite, así que el mapa se monta y **no pide una sola tesela**:
+los pines se ven —son HTML— y el fondo no. Sin error en consola ni petición
+fallida. Lo copia `scripts/copiar-worker-maplibre.mjs` antes de cada `dev` y
+`build`, y se registra con `setWorkerUrl` **antes** de construir ningún mapa.
+No se guardan los archivos en el repositorio a propósito: ahí se quedarían
+viejos al subir la versión de MapLibre, y esto volvería a romperse sin que nadie
+lo relacione.
+
+**El CSS de una librería va al bundle principal, no dentro del componente.**
+Con `dynamic()` el import acaba en el chunk que se carga aparte, y el lienzo de
+MapLibre se quedaba sin posicionar: **los pines se veían** —MapLibre les pone
+estilos en línea— **y el mapa no**. Un fallo mudo, sin error en consola ni en
+red, que parece un problema de teselas y no lo es.
 
 **Dos formas de entrar (fase 5):** Google para uso normal y contraseña para un
 usuario de prueba público. Google dice quién es, no si puede entrar: la

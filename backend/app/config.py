@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     classify_image_variant: str = "thumbnail"
     classify_max_attempts: int = 3
 
+    # Avisos de vuelta. Mas intentos que en lo demas: que a alguien no le
+    # llegue el aviso de que su reporte se resolvio es justo lo que hace que
+    # no vuelva a reportar.
+    notify_max_attempts: int = 6
+
     # --- Agrupacion ---
     # **Estos numeros son provisionales.** PLAN.md pide calibrarlos contra
     # doscientos reportes agrupados a mano, y eso todavia no existe. Van con

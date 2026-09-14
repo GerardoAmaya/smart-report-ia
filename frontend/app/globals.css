@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Aqui y no dentro del componente: con `dynamic()` el CSS acabaria en el
+   chunk que se carga aparte, y el lienzo del mapa se queda sin posicionar.
+   Los pines se verian igual —MapLibre les pone estilos en linea— y el mapa
+   no, que es justo el sintoma que tuvo. */
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 @custom-variant dark (&:is(.dark *));
 

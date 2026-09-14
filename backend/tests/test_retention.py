@@ -212,3 +212,100 @@ def test_dry_run_no_borra_huerfanos(session, monkeypatch):
         assert storage.exists(clave) is True
     finally:
         storage.delete(clave)
+
+
+# --- Evidencia del arreglo ---
+
+
+def evidencia_de_caso(session, cerrado_hace: timedelta | None):
+    """Un caso con su foto del arreglo, cerrado hace lo que se pida."""
+    from datetime import UTC, datetime
+
+    from app.models import Case, CasePhoto
+
+    caso = Case(
+        category="vialidad",
+        status="closed" if cerrado_hace else "open",
+        closed_at=(datetime.now(UTC) - cerrado_hace) if cerrado_hace else None,
+    )
+    session.add(caso)
+    session.flush()
+
+    datos = foto_sintetica(semilla=51)
+    clave = storage.build_key(caso.id, uuid.uuid4(), kind="evidencia", ext="jpg")
+    storage.put(clave, datos, "image/jpeg")
+
+    foto = CasePhoto(
+        case_id=caso.id,
+        uploaded_by="operador@ejemplo.sv",
+        storage_key=clave,
+        bytes=len(datos),
+    )
+    session.add(foto)
+    session.commit()
+    return caso, foto
+
+
+def test_el_barrido_de_huerfanos_no_se_lleva_la_evidencia(session, monkeypatch):
+    """Sin esto, el barrido borraria la foto del arreglo de **todos** los casos
+    cerrados: ninguna fila de `report_photos` las apunta, asi que parecian
+    sueltas."""
+    monkeypatch.setattr(settings, "orphan_grace_hours", 0)
+    _, foto = evidencia_de_caso(session, cerrado_hace=None)
+
+    assert foto.storage_key not in retention.orphans(session)
+
+    retention.purge_orphans(session)
+    assert storage.exists(foto.storage_key) is True
+    storage.delete(foto.storage_key)
+
+
+def test_la_evidencia_de_un_caso_cerrado_viejo_se_borra(session):
+    caso, foto = evidencia_de_caso(
+        session, cerrado_hace=timedelta(days=settings.retention_closed_days + 1)
+    )
+    clave = foto.storage_key
+
+    retention.run(session)
+    session.refresh(foto)
+
+    assert storage.exists(clave) is False
+    # La fila queda: el historial del caso no se evapora.
+    assert foto.deleted_at is not None
+
+
+def test_la_evidencia_reciente_no_se_toca(session):
+    _, foto = evidencia_de_caso(session, cerrado_hace=timedelta(days=1))
+    clave = foto.storage_key
+
+    retention.run(session)
+    session.refresh(foto)
+
+    assert storage.exists(clave) is True
+    assert foto.deleted_at is None
+    storage.delete(clave)
+
+
+def test_reabrir_saca_la_evidencia_del_alcance_de_la_retencion(session):
+    """Cuelga de `closed_at`, no de `updated_at`.
+
+    Un caso reabierto no puede seguir contando los noventa dias del cierre
+    anterior: contarlo desde `updated_at` habria borrado la foto de un caso que
+    se acababa de reabrir.
+    """
+    from app import dispatch
+
+    caso, foto = evidencia_de_caso(
+        session, cerrado_hace=timedelta(days=settings.retention_closed_days + 1)
+    )
+    clave = foto.storage_key
+
+    dispatch.reopen(session, caso)
+    session.commit()
+
+    retention.run(session)
+    session.refresh(foto)
+
+    assert storage.exists(clave) is True
+    assert foto.deleted_at is None
+    storage.delete(clave)

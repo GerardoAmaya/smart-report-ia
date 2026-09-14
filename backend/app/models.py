@@ -46,6 +46,8 @@ CASE_STATUSES = ("open", "assigned", "in_progress", "closed", "discarded")
 # "alone" incluido: un reporte sin nada cerca tambien deja constancia, y esa
 # constancia es lo que deja ver que no se agrupo por decision y no por olvido.
 GROUPING_DECISIONS = ("grouped", "rejected", "doubtful", "alone")
+NOTIFICATION_STATUSES = ("pending", "processing", "sent", "failed")
+NOTIFICATION_KINDS = ("assigned", "in_progress", "closed")
 PHOTO_STATUSES = ("pending", "processing", "stored", "failed", "rejected")
 PHOTO_KINDS = ("report", "evidence")
 
@@ -353,6 +355,17 @@ class Case(Base):
     )
     report_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
+    # RESTRICT: borrar una cuadrilla con casos asignados falla en vez de dejar
+    # los casos apuntando al vacio. Primero se reasignan.
+    crew_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("crews.id", ondelete="RESTRICT")
+    )
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Fecha propia y no `updated_at`: la retencion de las fotos cuelga de cuando
+    # se cerro, y `updated_at` se mueve con cualquier cambio.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closing_note: Mapped[str | None] = mapped_column(Text)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -364,6 +377,7 @@ class Case(Base):
         CheckConstraint("status IN " + str(CASE_STATUSES), name="ck_cases_status"),
         Index("ix_cases_centroid_gist", "centroid", postgresql_using="gist"),
         Index("ix_cases_category_status", "category", "status"),
+        Index("ix_cases_crew", "crew_id"),
     )
 
 
@@ -438,6 +452,116 @@ class User(Base):
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'operator', 'demo')", name="ck_users_role"),
         Index("ix_users_email", "email", unique=True),
+    )
+
+
+class Crew(Base):
+    """Una cuadrilla. Tabla y no una cadena suelta en `cases`.
+
+    Una cuadrilla mal escrita crearia una cuadrilla fantasma a la que se le
+    asignan casos que nadie mira.
+    """
+
+    __tablename__ = "crews"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_crews_name", "name", unique=True),)
+
+
+class CasePhoto(Base):
+    """La foto del arreglo.
+
+    Tabla propia y **no** `report_photos.kind = 'evidence'`, que es lo que la
+    fase 2 habia anticipado. La anticipacion estaba mal: no se parece a una foto
+    de reporte —la sube un operador, no se clasifica, no se le saca huella, y no
+    puede entrar en la agrupacion nunca—. Compartiendo tabla, cada consulta de
+    agrupacion necesitaria `WHERE kind='report'`, y olvidarlo una vez mete la
+    foto del arreglo como si fuera otro reporte del problema.
+    """
+
+    __tablename__ = "case_photos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False
+    )
+    # Quien la subio: una evidencia sin autor no se puede cuestionar.
+    uploaded_by: Mapped[str] = mapped_column(String(320), nullable=False)
+
+    storage_key: Mapped[str] = mapped_column(Text, nullable=False)
+    thumbnail_key: Mapped[str | None] = mapped_column(Text)
+    content_sha256: Mapped[str | None] = mapped_column(String(64))
+    bytes: Mapped[int | None] = mapped_column(Integer)
+    thumbnail_bytes: Mapped[int | None] = mapped_column(Integer)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    mime_type: Mapped[str | None] = mapped_column(String(64))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_case_photos_case", "case_id"),)
+
+
+class Notification(Base):
+    """Un aviso de vuelta a quien reporto.
+
+    **A todos los que reportaron, no solo al primero.** Es la parte que casi
+    nadie construye y sin la cual nadie reporta dos veces; y es lo que le da
+    sentido al agrupamiento mas alla de ahorrar trabajo, porque permite
+    responderle a cuatro personas con un solo arreglo.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False
+    )
+    channel: Mapped[str] = mapped_column(String(32), ForeignKey("channels.code"), nullable=False)
+    external_user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN " + str(NOTIFICATION_STATUSES), name="ck_notifications_status"),
+        CheckConstraint("kind IN " + str(NOTIFICATION_KINDS), name="ck_notifications_kind"),
+        # Una persona recibe **un** aviso por caso y tipo, aunque haya reportado
+        # el mismo problema tres veces. Sin esto, quien mas reporta mas molesta
+        # el sistema, que es al reves de lo que se quiere.
+        UniqueConstraint(
+            "case_id", "channel", "external_user_id", "kind", name="uq_notifications_destinatario"
+        ),
+        Index(
+            "ix_notifications_pending",
+            "next_attempt_at",
+            "created_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index(
+            "ix_notifications_processing",
+            "locked_at",
+            postgresql_where=text("status = 'processing'"),
+        ),
+        Index("ix_notifications_case", "case_id"),
     )
 
 

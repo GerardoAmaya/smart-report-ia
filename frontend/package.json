@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "copiar-worker": "node scripts/copiar-worker-maplibre.mjs",
+    "predev": "npm run copiar-worker",
+    "prebuild": "npm run copiar-worker"
   },
   "dependencies": {
     "@tanstack/react-query": "5.102.8",

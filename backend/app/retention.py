@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app import logging_setup, storage
 from app.config import settings
-from app.models import Report, ReportPhoto
+from app.models import Case, CasePhoto, Report, ReportPhoto
 
 log = logging.getLogger("smart_report.retention")
 
@@ -51,9 +51,9 @@ def reglas() -> list[Regla]:
             antiguedad=timedelta(days=settings.retention_incomplete_days),
             motivo="reporte nunca completado: no es un reporte, es media conversacion",
         ),
-        # Inerte hasta la fase 6: el estado "closed" todavia no existe porque el
-        # cierre no existe. La regla se escribe ahora para que la politica este
-        # completa, y empieza a borrar sola el dia que haya cierres.
+        # Viva desde la fase 6, cuando aparecio el cierre. Se escribio en la
+        # fase 2 para que la politica estuviera completa, y empezo a borrar sola
+        # el dia que hubo cierres, sin que nadie tuviera que volver aqui.
         Regla(
             nombre="cerrado",
             estados_de_reporte=("closed",),
@@ -78,6 +78,43 @@ def expired(session: Session, regla: Regla, limite: int = 500) -> list[ReportPho
         .limit(limite)
     )
     return list(session.execute(stmt).scalars().all())
+
+
+def expired_case_photos(session: Session, limite: int = 500) -> list[CasePhoto]:
+    """Fotos de evidencia de casos cerrados hace mas de lo que dice la politica.
+
+    Cuelgan de `closed_at` y no de `updated_at`: un caso reabierto deja
+    `closed_at` en nulo, asi que su evidencia vuelve a estar fuera del alcance
+    de la retencion mientras siga abierto. Contarlo desde `updated_at` habria
+    borrado la foto de un caso que se acababa de reabrir.
+    """
+    corte = datetime.now(UTC) - timedelta(days=settings.retention_closed_days)
+    stmt = (
+        select(CasePhoto)
+        .join(Case, Case.id == CasePhoto.case_id)
+        .where(
+            Case.status == "closed",
+            Case.closed_at.is_not(None),
+            Case.closed_at < corte,
+            CasePhoto.deleted_at.is_(None),
+        )
+        .limit(limite)
+    )
+    return list(session.execute(stmt).scalars().all())
+
+
+def purge_case_photo(session: Session, foto: CasePhoto) -> None:
+    for clave in (foto.storage_key, foto.thumbnail_key):
+        if clave:
+            try:
+                storage.delete(clave)
+            except Exception:
+                log.exception("no se pudo borrar %s", clave)
+                raise
+
+    foto.deleted_at = datetime.now(UTC)
+    foto.storage_key = ""
+    foto.thumbnail_key = None
 
 
 def purge_photo(session: Session, foto: ReportPhoto, motivo: str) -> None:
@@ -114,6 +151,16 @@ def run(session: Session, dry_run: bool = False) -> dict[str, int]:
         session.commit()
         log.info("retencion %s: %s fotos borradas", regla.nombre, len(fotos))
 
+    # Las de evidencia van aparte porque cuelgan de `closed_at` y no del estado
+    # del reporte: son de la cuadrilla, no de quien reporto.
+    evidencias = expired_case_photos(session)
+    resultado["evidencia"] = len(evidencias)
+    if evidencias and not dry_run:
+        for foto in evidencias:
+            purge_case_photo(session, foto)
+        session.commit()
+        log.info("retencion evidencia: %s fotos borradas", len(evidencias))
+
     return resultado
 
 
@@ -131,8 +178,15 @@ def orphans(session: Session, limite: int = 1000) -> list[str]:
     """
     corte = datetime.now(UTC) - timedelta(hours=settings.orphan_grace_hours)
 
+    # **Las de evidencia tambien.** Sin ellas, el barrido las tomaria por
+    # huerfanas y borraria la foto del arreglo de todos los casos cerrados.
     referenciadas: set[str] = set()
-    for columna in (ReportPhoto.storage_key, ReportPhoto.thumbnail_key):
+    for columna in (
+        ReportPhoto.storage_key,
+        ReportPhoto.thumbnail_key,
+        CasePhoto.storage_key,
+        CasePhoto.thumbnail_key,
+    ):
         referenciadas.update(k for k in session.execute(select(columna)).scalars().all() if k)
 
     cliente = storage.client()

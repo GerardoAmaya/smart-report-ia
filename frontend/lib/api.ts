@@ -30,7 +30,12 @@ async function pedir<T>(ruta: string, esquema: z.ZodType<T>, init?: RequestInit)
       // La sesion va en cookie: sin esto el navegador no la manda a otro origen
       // y todo responde 401 sin explicacion.
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      // Con FormData no se pone Content-Type: el navegador lo escribe con el
+      // separador de partes dentro, y fijarlo a mano rompe la peticion.
+      headers:
+        init?.body instanceof FormData
+          ? { ...init?.headers }
+          : { "Content-Type": "application/json", ...init?.headers },
       cache: "no-store",
     });
   } catch {
@@ -111,6 +116,21 @@ export const ReporteSchema = z.object({
 });
 export type Reporte = z.infer<typeof ReporteSchema>;
 
+export const CuadrillaSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  notes: z.string().nullable().optional(),
+});
+export type Cuadrilla = z.infer<typeof CuadrillaSchema>;
+
+export const EvidenciaFotoSchema = z.object({
+  id: z.string(),
+  thumbnail_url: z.string().nullable(),
+  original_url: z.string().nullable(),
+  uploaded_by: z.string(),
+  created_at: z.string(),
+});
+
 export const DetalleSchema = z.object({
   id: z.string(),
   status: z.string(),
@@ -118,6 +138,16 @@ export const DetalleSchema = z.object({
   severity: z.string().nullable(),
   report_count: z.number(),
   created_at: z.string(),
+  crew: CuadrillaSchema.nullable(),
+  assigned_at: z.string().nullable(),
+  closed_at: z.string().nullable(),
+  closing_note: z.string().nullable(),
+  evidence: z.array(EvidenciaFotoSchema),
+  notifications: z.object({
+    sent: z.number(),
+    pending: z.number(),
+    failed: z.number(),
+  }),
   reports: z.array(ReporteSchema),
 });
 export type Detalle = z.infer<typeof DetalleSchema>;
@@ -179,6 +209,52 @@ export const api = {
     pedir(`/board/reports/${reportId}/ungroup`, z.object({ ok: z.boolean() }), {
       method: "POST",
     }),
+
+  cuadrillas: () => pedir("/board/crews", z.object({ crews: z.array(CuadrillaSchema) })),
+
+  asignar: (casoId: string, crewId: string) =>
+    pedir(
+      `/board/cases/${casoId}/assign?crew_id=${crewId}`,
+      z.object({ ok: z.boolean(), status: z.string(), crew: z.string(), avisados: z.number() }),
+      { method: "POST" },
+    ),
+
+  empezar: (casoId: string) =>
+    pedir(
+      `/board/cases/${casoId}/start`,
+      z.object({ ok: z.boolean(), status: z.string(), avisados: z.number() }),
+      { method: "POST" },
+    ),
+
+  /**
+   * Sube la foto del arreglo.
+   *
+   * Sin `Content-Type`: con FormData el navegador tiene que ponerlo el mismo,
+   * porque incluye el separador de partes. Fijarlo a mano rompe la peticion.
+   */
+  subirEvidencia: async (casoId: string, archivo: File) => {
+    const cuerpo = new FormData();
+    cuerpo.append("archivo", archivo);
+    return pedir(
+      `/board/cases/${casoId}/evidence`,
+      z.object({ ok: z.boolean(), id: z.string() }),
+      { method: "POST", body: cuerpo, headers: {} },
+    );
+  },
+
+  cerrar: (casoId: string, nota?: string) =>
+    pedir(
+      `/board/cases/${casoId}/close${nota ? `?nota=${encodeURIComponent(nota)}` : ""}`,
+      z.object({ ok: z.boolean(), status: z.string(), avisados: z.number() }),
+      { method: "POST" },
+    ),
+
+  reabrir: (casoId: string) =>
+    pedir(
+      `/board/cases/${casoId}/reopen`,
+      z.object({ ok: z.boolean(), status: z.string() }),
+      { method: "POST" },
+    ),
 
   cambiarEstado: (casoId: string, nuevo: string) =>
     pedir(`/board/cases/${casoId}/status?nuevo=${nuevo}`, z.object({ ok: z.boolean(), status: z.string() }), {

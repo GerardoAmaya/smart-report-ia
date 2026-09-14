@@ -66,13 +66,34 @@ def test_confirmar_deja_la_categoria_propuesta(client, session, propuesta):
 
     assert r.status_code == 200
     # Se contesta dentro de la misma respuesta HTTP, sin mandar nada aparte.
-    assert r.json()["method"] == "answerCallbackQuery"
-    assert r.json()["text"] == confirm.GRACIAS
+    cuerpo = r.json()
+    assert cuerpo["method"] == "editMessageText"
 
     session.refresh(propuesta)
     assert propuesta.status == "confirmed"
     assert propuesta.final_category == Category.VIALIDAD.value
     assert propuesta.confirmed_at is not None
+
+
+def test_confirmar_se_ve_en_el_chat(client, session, propuesta):
+    """El bug: confirmar parecia no hacer nada.
+
+    Se contestaba con `answerCallbackQuery`, que Telegram pinta como un aviso
+    de un segundo sobre el chat. Corregir —el camino raro— reescribia el
+    mensaje y si se veia; confirmar —el camino normal— no dejaba rastro.
+    Alguien probo desde su telefono, le dio dos veces, y las dos veces habia
+    funcionado.
+    """
+    r = post(client, update_con_boton(data=f"s:{propuesta.id}", message_id=900))
+    cuerpo = r.json()
+
+    assert cuerpo["method"] == "editMessageText"
+    assert cuerpo["message_id"] == 900
+    # El texto reemplaza a la propuesta, asi que tiene que repetir que se
+    # confirmo: si solo dijera "gracias", el chat perderia el dato.
+    assert "Calle o acera" in cuerpo["text"]
+    # Sin botones: ya no hay nada que elegir.
+    assert "reply_markup" not in cuerpo
 
 
 def test_corregir_muestra_las_categorias(client, session, propuesta):
@@ -98,7 +119,12 @@ def test_elegir_otra_categoria_la_marca_corregida(client, session, propuesta):
     indice = categorias_reales().index(Category.AGUA)
     r = post(client, update_con_boton(data=f"c:{propuesta.id}:{indice}"))
 
-    assert r.json()["text"] == confirm.CORREGIDO
+    cuerpo = r.json()
+    assert cuerpo["method"] == "editMessageText"
+    # Nombra la categoria elegida, no la que se habia propuesto.
+    assert "Agua o drenaje" in cuerpo["text"]
+    assert "reply_markup" not in cuerpo
+
     session.refresh(propuesta)
     assert propuesta.status == "corrected"
     assert propuesta.final_category == Category.AGUA.value

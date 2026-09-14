@@ -162,18 +162,23 @@ class TelegramChannel:
         Editar en vez de mandar otro mensaje deja la conversacion limpia —no se
         acumulan preguntas viejas con botones que ya no valen— y cabe en el
         cuerpo del webhook.
+
+        Sin opciones se omite `reply_markup`, que en `editMessageText` quita el
+        teclado: es como queda el mensaje cuando ya no hay nada que elegir.
         """
-        return {
+        cuerpo: dict = {
             "method": "editMessageText",
             "chat_id": external_user_id,
             "message_id": int(message_id),
             "text": text,
-            "reply_markup": {
+        }
+        if options:
+            cuerpo["reply_markup"] = {
                 "inline_keyboard": [
                     [{"text": etiqueta, "callback_data": valor}] for etiqueta, valor in options
                 ]
-            },
-        }
+            }
+        return cuerpo
 
     # --- Red: fase 2 en adelante ---
 

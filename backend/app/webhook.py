@@ -133,15 +133,19 @@ def telegram_webhook(
         # Antes se mandaba un mensaje aparte desde BackgroundTasks, que es una
         # llamada de red saliente: rompia la regla de la fase 1 y se notaba en
         # el boton, que giraba segundos antes de resolverse.
-        if respuesta.options and respuesta.edit_message_id:
-            # Reemplaza la pregunta por la siguiente, en el sitio.
+        if respuesta.edit_message_id:
+            # Se edita tambien cuando no quedan opciones. Antes ese caso
+            # contestaba con `answerCallbackQuery`, que Telegram pinta como un
+            # aviso de un segundo: confirmar —el camino correcto— parecia no
+            # hacer nada, mientras corregir reescribia el mensaje y si se veia.
+            # Reportado desde un telefono real: "dos veces le di, y no paso de
+            # ahi". Habia pasado las dos veces.
             return canal.edit_with_options(
                 mensaje.external_user_id,
                 respuesta.edit_message_id,
                 respuesta.text,
                 respuesta.options,
             )
-        # Confirmacion corta: aviso emergente y se acabo.
         return canal.ack_choice(respuesta.choice_id, respuesta.text)
 
     if respuesta.options:

@@ -340,6 +340,29 @@ comportamiento correcto— y afirmar cuántos hay en un caso se vuelve imposible
 comentarios del código pueden ir sin ellas; la evidencia que se muestra en el
 tablero no. Hay una prueba que lo fija.
 
+**Una eleccion se contesta reescribiendo el mensaje, no con un aviso.**
+`answerCallbackQuery` pinta un globo de un segundo sobre el chat. Confirmar
+—el camino normal— contestaba asi y parecia no hacer nada, mientras corregir
+—el camino raro— reescribia el mensaje y si se veia. Alguien probo desde su
+telefono, le dio dos veces a «Si, es correcto», y las dos veces habia
+funcionado. El texto nuevo repite la categoria porque **reemplaza** a la
+propuesta: si solo dijera «gracias», el chat perderia lo unico que se confirmo.
+
+**La propuesta llega despues de pedir la ubicacion, no antes.** Se considero
+mostrarla en cuanto llega la foto, que se lee mejor. Medido: diez segundos
+desde la foto hasta la propuesta —cuatro de descarga y miniatura, seis del
+modelo—. Mostrarla primero deja al bot mudo esos diez segundos antes de que la
+persona haya hecho nada; pidiendo la ubicacion se llenan con algo util, y la
+agrupacion necesita la ubicacion de todos modos. La clasificacion ya arranca
+con la foto y no espera a la ubicacion, asi que el orden no cuesta tiempo. Lo
+que si cambio es el texto: ya no dice «quedo registrado» —que suena a final y
+hace que la pregunta siguiente parezca de otra conversacion— sino que anuncia
+que la revision viene en camino.
+
+**El bot no manda Markdown.** El motivo de la propuesta lo escribe el modelo, y
+un guion bajo suelto hace que Telegram rechace el mensaje entero con 400. Los
+asteriscos se quitaron; la negrita no vale el mensaje perdido.
+
 **Dos formas de entrar (fase 5):** Google para uso normal y contraseña para un
 usuario de prueba público. Google dice quién es, no si puede entrar: la
 autorización es una tabla de correos permitidos con su rol. La contraseña del

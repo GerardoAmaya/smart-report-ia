@@ -28,8 +28,12 @@ PEDIR_FOTO = "Mandame una foto del problema y despues tu ubicacion."
 PEDIR_UBICACION = (
     "Recibi la foto. Ahora mandame la ubicacion con el boton de abajo, para saber donde esta."
 )
+# No dice "quedo registrado" y punto: despues de esto llega la propuesta de
+# categoria, y un mensaje que suena a final hace que la pregunta siguiente
+# parezca de otra conversacion.
 LISTO = (
-    "Listo, tu reporte quedo registrado. Te aviso cuando se atienda.\n\n"
+    "Listo, ya tengo la foto y la ubicacion. Dame unos segundos, estoy "
+    "revisando la foto y te digo que creo que es.\n\n"
     "Si querés, escribime que pasó. Ayuda a no confundirlo con otro reporte "
     "cercano."
 )

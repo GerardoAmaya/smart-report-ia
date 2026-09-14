@@ -40,8 +40,6 @@ ETIQUETA_SEVERIDAD: dict[str, str] = {
     Severity.BAJA: "sin urgencia",
 }
 
-GRACIAS = "Gracias, quedo confirmado."
-CORREGIDO = "Corregido, gracias. Eso ayuda a que el sistema mejore."
 YA_CONFIRMADO = "Ese reporte ya estaba confirmado."
 NO_ENCONTRADO = "No encuentro ese reporte."
 
@@ -51,9 +49,11 @@ def pregunta(clasificacion: Classification) -> tuple[str, list[tuple[str, str]]]
     etiqueta = ETIQUETAS.get(clasificacion.proposed_category, clasificacion.proposed_category)
     severidad = ETIQUETA_SEVERIDAD.get(clasificacion.proposed_severity, "")
 
+    # Sin Markdown a proposito: `proposed_reason` lo escribe el modelo y un
+    # guion bajo suelto haria que Telegram rechace el mensaje entero con 400.
     texto = (
         f"Revise tu reporte y creo que es:\n\n"
-        f"**{etiqueta}** ({severidad})\n"
+        f"{etiqueta} ({severidad})\n"
         f"{clasificacion.proposed_reason}\n\n"
         f"¿Es correcto?"
     )
@@ -75,6 +75,18 @@ def opciones_de_categoria(clasificacion: Classification) -> tuple[str, list[tupl
     ]
     opciones.append((ETIQUETAS[Category.NO_ES_REPORTE], f"{PREFIJO_CATEGORIA}{clasificacion.id}:x"))
     return texto, opciones
+
+
+def _resumen(clasificacion: Classification, encabezado: str, categoria: str) -> str:
+    """Como queda el mensaje despues de responder.
+
+    Repite la categoria porque este texto **reemplaza** a la propuesta: si solo
+    dijera "gracias", el chat perderia lo unico que la persona confirmo, y
+    quien lo relea dentro de una semana no sabria que dijo que si.
+    """
+    etiqueta = ETIQUETAS.get(categoria, categoria)
+    severidad = ETIQUETA_SEVERIDAD.get(clasificacion.final_severity, "")
+    return f"{encabezado}\n\n{etiqueta} ({severidad})\n\nTe aviso por aqui cuando se atienda."
 
 
 def _buscar(session: Session, cid: str, external_user_id: str) -> Classification | None:
@@ -111,7 +123,7 @@ def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[
         clasificacion.status = "confirmed"
         clasificacion.confirmed_at = datetime.now(UTC)
         _agrupar(session, clasificacion)
-        return GRACIAS, []
+        return _resumen(clasificacion, "Confirmado, gracias.", clasificacion.final_category), []
 
     if valor.startswith(PREFIJO_NO):
         clasificacion = _buscar(session, valor[len(PREFIJO_NO) :], external_user_id)
@@ -142,7 +154,11 @@ def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[
         clasificacion.status = "corrected"
         clasificacion.confirmed_at = datetime.now(UTC)
         _agrupar(session, clasificacion)
-        return CORREGIDO, []
+        return _resumen(
+            clasificacion,
+            "Corregido, gracias. Eso ayuda a que el sistema mejore.",
+            clasificacion.final_category,
+        ), []
 
     return NO_ENCONTRADO, []
 

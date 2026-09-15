@@ -71,6 +71,9 @@ export function Detalle({ casoId }: { casoId: string | null }) {
 
   const puedeDespachar = puede(perfil, "despachar");
   const agrupado = data.report_count > 1;
+  // Donde esta el caso: la direccion del primer reporte que tenga una. No
+  // todos la tienen —hay puntos sin nombre— y eso no impide despachar.
+  const donde = data.reports.find((r) => r.address)?.address ?? null;
 
   return (
     <motion.article
@@ -93,6 +96,12 @@ export function Detalle({ casoId }: { casoId: string | null }) {
               {" · abierto "}
               {hace(data.created_at)}
             </p>
+            {donde && (
+              <p className="mt-2 flex items-start gap-1.5 text-sm">
+                <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span>{donde}</span>
+              </p>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Severidad valor={data.severity} />
@@ -214,6 +223,15 @@ function Fila({
             )}
           >
             {decisiva.reason}
+          </p>
+        )}
+
+        {/* La direccion de **este** reporte, que puede no ser la del caso:
+            cuatro personas reportan el mismo hueco desde cuatro esquinas. */}
+        {reporte.address && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="mt-px size-3 shrink-0" aria-hidden />
+            <span>{reporte.address}</span>
           </p>
         )}
 

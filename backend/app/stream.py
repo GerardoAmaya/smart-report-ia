@@ -61,23 +61,29 @@ async def _eventos(request: Request) -> AsyncIterator[str]:
         # cambie algo, y puede distinguir "conectado y en silencio" de "colgado".
         yield "event: abierto\ndata: {}\n\n"
 
-        avisos = conn.notifies()
         while True:
             if await request.is_disconnected():
                 break
-            try:
-                aviso = await asyncio.wait_for(avisos.__anext__(), timeout=LATIDO_SEGUNDOS)
-            except TimeoutError:
+
+            # El plazo lo pone psycopg, no `asyncio.wait_for`. Con `wait_for`
+            # el vencimiento **cancela** al generador de avisos, que se cierra:
+            # la siguiente lectura levantaba `StopAsyncIteration` y el flujo se
+            # moria en el primer latido. El navegador reconectaba solo, asi que
+            # parecia funcionar; lo que se perdia eran los cambios ocurridos en
+            # el hueco entre la muerte y la reconexion.
+            oyo_algo = False
+            async for aviso in conn.notifies(timeout=LATIDO_SEGUNDOS):
+                oyo_algo = True
+                try:
+                    datos = json.loads(aviso.payload)
+                except json.JSONDecodeError:
+                    continue
+                yield f"event: cambio\ndata: {json.dumps(datos)}\n\n"
+
+            if not oyo_algo:
                 # Comentario SSE: mantiene viva la conexion sin generar un
                 # evento que el cliente tenga que interpretar.
                 yield ": latido\n\n"
-                continue
-
-            try:
-                datos = json.loads(aviso.payload)
-            except json.JSONDecodeError:
-                continue
-            yield f"event: cambio\ndata: {json.dumps(datos)}\n\n"
     except asyncio.CancelledError:
         raise
     except Exception:

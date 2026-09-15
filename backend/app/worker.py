@@ -20,7 +20,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
-from app import classify_worker, images, logging_setup, notify_worker, storage
+from app import (
+    classify_worker,
+    geocode_worker,
+    images,
+    logging_setup,
+    notify_worker,
+    storage,
+)
 from app.channels import get_channel
 from app.config import settings
 from app.db import SessionLocal
@@ -211,12 +218,13 @@ def main() -> int:
                 session.execute(text("SELECT 1"))
                 # Dos colas en el mismo proceso: el volumen no justifica un
                 # contenedor mas, que es algo mas que desplegar y vigilar.
-                # Tres colas en el mismo proceso: el volumen no justifica un
+                # Cuatro colas en el mismo proceso: el volumen no justifica un
                 # contenedor por cola, que seria algo mas que desplegar y
                 # vigilar por cada tipo de trabajo.
                 procesadas = (
                     run_once(session)
                     + classify_worker.run_once(session)
+                    + geocode_worker.run_once(session)
                     + notify_worker.run_once(session)
                 )
         except Exception:

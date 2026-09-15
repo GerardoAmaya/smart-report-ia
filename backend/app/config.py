@@ -108,6 +108,24 @@ class Settings(BaseSettings):
     # no vuelva a reportar.
     notify_max_attempts: int = 6
 
+    # --- Direccion escrita ---
+    # Redirigible como la de Telegram: permite probar el camino entero contra
+    # un servicio falso, sin pegarle al publico en cada corrida de CI.
+    geocode_base_url: str = "https://nominatim.openstreetmap.org"
+    # La politica del servicio publico exige identificarse con algo que
+    # permita contactar. Sin esto bloquea, y bloquea sin avisar.
+    geocode_user_agent: str = "smart-report-sv (contacto: sin definir)"
+    geocode_timeout_seconds: float = 20.0
+    geocode_max_attempts: int = 4
+    # Una consulta por segundo es el tope que pide la politica del servicio
+    # publico. Se respeta desde el codigo y no de palabra.
+    geocode_min_interval_seconds: float = 1.1
+    geocode_batch_size: int = 5
+    # Apagable entero: sin direccion el sistema funciona igual, el aviso cae
+    # en el enlace al punto. Que se pueda apagar es lo que permite desplegar
+    # sin depender de un servicio de terceros desde el primer dia.
+    geocode_enabled: bool = True
+
     # --- Agrupacion ---
     # **Estos numeros son provisionales.** PLAN.md pide calibrarlos contra
     # doscientos reportes agrupados a mano, y eso todavia no existe. Van con

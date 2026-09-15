@@ -88,6 +88,40 @@ def test_la_cola_trae_los_casos(sesion_iniciada, session):
     assert caso["severity"] == "alta"
 
 
+def test_la_cola_dice_donde_esta_cada_caso(sesion_iniciada, session):
+    """«Donde» es lo primero que pregunta quien despacha.
+
+    La direccion del caso sale del primer reporte que tenga una, y no se guarda
+    en el caso: el centroide se mueve al entrar cada reporte, y una direccion
+    que se recalcula cambiaria de nombre sola.
+    """
+    primero = crear_reporte(session)
+    segundo = crear_reporte(session, metros=10, usuario="2")
+    primero.address_text = "Alameda Araujo, Colonia San Francisco, San Salvador"
+    segundo.address_text = "Calle de al lado, San Salvador"
+    session.commit()
+
+    caso = sesion_iniciada.get("/board/cases").json()["cases"][0]
+    assert caso["address"] == "Alameda Araujo, Colonia San Francisco, San Salvador"
+
+    detalle = sesion_iniciada.get(f"/board/cases/{caso['id']}").json()
+    # En el detalle cada reporte lleva la suya: cuatro personas reportan el
+    # mismo hueco desde cuatro esquinas.
+    direcciones = {r["address"] for r in detalle["reports"]}
+    assert direcciones == {
+        "Alameda Araujo, Colonia San Francisco, San Salvador",
+        "Calle de al lado, San Salvador",
+    }
+
+
+def test_un_caso_sin_direccion_no_rompe_la_cola(sesion_iniciada, session):
+    """No todo punto tiene nombre, y eso no impide despachar."""
+    crear_reporte(session)
+
+    caso = sesion_iniciada.get("/board/cases").json()["cases"][0]
+    assert caso["address"] is None
+
+
 def test_lo_grave_va_primero(sesion_iniciada, session):
     """Quien despacha necesita ver primero lo mas grave, no lo mas reciente."""
     crear_reporte(session, categoria=Category.DESECHOS.value)

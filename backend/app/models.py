@@ -130,6 +130,14 @@ class Report(Base):
     caption: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), nullable=False, server_default="incomplete")
 
+    # Como se llama ese punto, resuelto aparte y cacheado. Nulo con
+    # `geocoded_at` puesto significa "se intento y el sitio no tiene nombre",
+    # que no es lo mismo que "falta intentarlo": sin esa distincion el
+    # trabajador reintentaria para siempre los descampados.
+    address_text: Mapped[str | None] = mapped_column(String(200))
+    geocoded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    geocode_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
     # SET NULL en la migracion, no CASCADE: deshacer una agrupacion devuelve los
     # reportes, no los borra.
     case_id: Mapped[uuid.UUID | None] = mapped_column(

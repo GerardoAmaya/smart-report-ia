@@ -13,6 +13,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
+import { MapPin } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, type Caso } from "@/lib/api";
@@ -144,6 +145,15 @@ function Item({
         </span>
         <Cuantos n={caso.report_count} />
       </div>
+      {/* Donde. Es lo primero que pregunta quien despacha y hasta ahora habia
+          que abrir el caso para saberlo. Se corta en una linea: son ocho horas
+          mirando esta lista y una direccion larga rompe el ritmo de la cola. */}
+      {caso.address && (
+        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+          <MapPin className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">{caso.address}</span>
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <Severidad valor={caso.severity} />
         <Dudoso cuantos={caso.doubtful_count} />

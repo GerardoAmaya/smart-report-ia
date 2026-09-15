@@ -73,6 +73,8 @@ export const CasoSchema = z.object({
   doubtful_count: z.number(),
   created_at: z.string(),
   updated_at: z.string(),
+  // Puede faltar: no todo punto tiene nombre, y el mapa lo sigue enseñando.
+  address: z.string().nullable(),
 });
 export type Caso = z.infer<typeof CasoSchema>;
 
@@ -97,6 +99,7 @@ export const FotoSchema = z.object({
 export const ReporteSchema = z.object({
   id: z.string(),
   caption: z.string().nullable(),
+  address: z.string().nullable(),
   grouping_status: z.enum(["pending", "grouped", "alone", "doubtful"]),
   created_at: z.string(),
   lat: z.number().nullable(),

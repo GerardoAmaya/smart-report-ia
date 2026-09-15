@@ -82,15 +82,16 @@ def sitio(reporte: Report | None, session: Session | None = None) -> str:
     semana recibe dos veces "tu reporte sobre el agua o drenaje". La fecha lo
     distingue y el punto lo confirma.
 
-    No se pone una direccion porque no la tenemos: de la ubicacion solo llegan
-    coordenadas, y traducirlas a calle pide un servicio de geocodificacion que
-    hoy no existe en el sistema. El enlace enseña el punto exacto —el mismo que
-    recibio la cuadrilla— sin inventarse un nombre de calle que podria estar mal.
+    La direccion, cuando se pudo resolver, va antes del enlace; cuando no, el
+    enlace va solo. Nunca al reves: el punto es el dato y la direccion es la
+    comodidad, asi que si hay que perder una, se pierde la de encima.
     """
     if reporte is None:
         return ""
 
     señas = f"Es el que mandaste {_cuando(reporte.created_at)}"
+    if reporte.address_text:
+        señas += f", en {reporte.address_text}."
 
     if session is not None and reporte.location is not None:
         punto = session.execute(

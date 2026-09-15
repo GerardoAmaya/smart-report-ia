@@ -48,11 +48,13 @@ existe:
 - Agrupación por código con distancia PostGIS, evidencia escrita y deshacer
 - Tablero con cola, detalle, mapa y panel de métricas; entrada con Google y con
   contraseña, y permisos comprobados en la API
+- Dirección escrita de cada reporte, resuelta aparte y cacheada, en el tablero
+  y en el aviso de vuelta
 - Despacho: asignar cuadrilla, cerrar con foto de evidencia, y **aviso de
   vuelta a todos los que reportaron**, encolado y con reintentos
 - Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
 - Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
-- Diecinueve migraciones, una por tabla, y seeders versionados aparte
+- Veinte migraciones, una por tabla, y seeders versionados aparte
 - 198 pruebas y 9 recorridos en verde, CI en verde
 
 **Las fases 3, 4 y 5 no están cerradas**, y cada una espera una verificación que
@@ -287,12 +289,43 @@ nombres de dia y mes estan escritos en el codigo: el contenedor no trae la
 configuracion regional en español y `strftime("%A")` devolveria «Sunday» sin
 avisar.
 
-**El sitio se enseña como punto, no como direccion.** De la ubicacion solo
-llegan coordenadas; traducirlas a nombre de calle pide un servicio de
-geocodificacion que no existe en el sistema, y una calle inventada es peor que
-ninguna. El enlace abre el punto exacto que recibio la cuadrilla. Si algun dia
-se quiere la direccion escrita, es geocodificacion inversa con su columna
-cacheada, no una llamada por aviso.
+**El sitio se enseña con direccion y punto, y el punto manda.** La direccion
+se resuelve aparte y se guarda en el reporte; el enlace al punto va siempre. Si
+hay que perder una, se pierde la de encima: el punto es el dato que recibio la
+cuadrilla y el que uso la agrupacion, la direccion es la comodidad.
+
+**La direccion se arma de los campos con estructura, nunca del nombre del
+lugar.** El servicio devuelve tambien el negocio o edificio mas cercano, y
+«Megacentro de Vacunacion» como direccion de un bache manda a la cuadrilla a
+mirar la puerta equivocada. Se usan calle, colonia y ciudad. Sin calle ni
+colonia no hay direccion: «San Salvador» a secas no lleva a nadie a ningun
+lado, y una direccion que no sirve para llegar es peor que ninguna porque
+parece que sirve.
+
+**La direccion es la cuarta cola del trabajador, y la cola es la propia fila
+del reporte.** `geocoded_at` nulo con ubicacion puesta. Va ahi y no en el aviso
+porque es red, y un aviso que espera a un tercero se pierde por algo que ya se
+sabia. Hacen falta las dos columnas y no una: sin la fecha no se distingue «no
+se ha intentado» de «se intento y el sitio no tiene nombre», y el trabajador
+reintentaria para siempre los descampados.
+
+**Se puede apagar entero con `GEOCODE_ENABLED`.** Sin direccion el sistema
+funciona igual y el aviso cae en el enlace. Que se pueda apagar es lo que
+permite desplegar sin depender de un tercero desde el primer dia, y lo que
+apaga las pruebas extremo a extremo: cada corrida inventa coordenadas por todo
+el mapa, y pedirle el nombre de cada una a un servicio gratuito es gastarle la
+cuota para resolver sitios que no existen.
+
+**La direccion del caso es la del primer reporte que tenga una**, calculada al
+leer y no guardada en el caso. El centroide se mueve cada vez que entra un
+reporte; una direccion guardada ahi se recalcularia con el y el caso cambiaria
+de nombre solo, delante de quien lo esta despachando. En el detalle cada
+reporte enseña la suya, que puede ser otra: cuatro personas reportan el mismo
+hueco desde cuatro esquinas.
+
+**El servicio publico exige identificarse y una consulta por segundo.** Sin
+`User-Agent` con contacto bloquea, y bloquea sin avisar. El tope se respeta
+desde el codigo —una espera entre consultas— y no de palabra.
 
 **El enlace va al final y sin punto detras.** Telegram se traga el punto dentro
 del enlace y el mapa abre en un sitio que no existe. Hay una prueba que lo fija.
@@ -334,6 +367,18 @@ está en medio. SSE y no WebSocket porque el tablero escucha y no habla.
 tentación es avisar a mano en cada sitio que cambia algo, y es así como el
 tablero se queda viejo: basta olvidar uno. Un disparador no se puede olvidar, y
 vive en una migración versionada.
+
+**El plazo del latido lo pone psycopg, nunca `asyncio.wait_for`.** `wait_for`
+**cancela** lo que estaba esperando cuando vence, y eso cierra el generador de
+avisos: la siguiente lectura levantaba `StopAsyncIteration` y el flujo se moria
+en el primer latido, cada veinte segundos y con cada tablero abierto. Parecia
+funcionar —el navegador reconecta solo— y lo que se perdia eran los cambios
+ocurridos en el hueco entre la muerte y la reconexion, que es exactamente lo
+que nadie iba a notar hasta que importara. Se usa `conn.notifies(timeout=…)`,
+que devuelve el control sin matar nada. Hay dos pruebas: una de que el flujo
+aguanta varios latidos seguidos, y otra de que **despues** de callarse sigue
+oyendo a Postgres —porque un flujo que aguanta los latidos pero ya no escucha
+seria peor que el fallo original, al no dejar ni rastro en los registros.
 
 **Por el flujo solo va «algo cambió aquí», nunca la fila.** Mandar el dato
 obligaría a mantener dos formas de leer lo mismo, y la segunda se queda vieja.
@@ -510,6 +555,16 @@ contra el segundo error, no contra el promedio de los dos.
   marcado con su motivo esperando el tablero de la fase 5.
 - **El costo por foto tiene una sola muestra real.** `make bench` lo recalcula
   con lo que haya en la base; conviene repetirlo cuando entren reportes.
+- **La direccion depende de un servicio publico gratuito.** Nominatim pide un
+  maximo de una consulta por segundo y no da garantia de servicio. Con volumen
+  real hay que pasar a una instancia propia o a un proveedor de pago; el cambio
+  es `GEOCODE_BASE_URL`, porque la respuesta es la misma. Hasta entonces, si el
+  servicio se cae, los reportes se quedan sin direccion y el aviso lleva solo
+  el enlace, que es el comportamiento correcto.
+- **Los datos de direccion son de OpenStreetMap y piden atribucion.** La ODbL
+  la exige en lo que se publique derivado de ellos. El tablero ya la lleva en
+  el mapa; el aviso de Telegram no dice de donde sale la calle. Antes de
+  desplegar hay que decidir si ahi tambien va, y donde.
 - **La retención se corre a mano.** No hay tarea programada todavía; en la
   fase 8 tiene que entrar al despliegue o la política queda escrita y sin
   aplicar, que es peor que no tenerla.

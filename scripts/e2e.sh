@@ -25,6 +25,11 @@ set -a; . ./.env; set +a
 
 export TELEGRAM_API_BASE_URL="http://telegram-falso:8099/bot"
 export TELEGRAM_API_FILE_URL="http://telegram-falso:8099/file/bot"
+# Sin direcciones: cada corrida inventa coordenadas por todo el mapa, y pedirle
+# el nombre de cada una a un servicio publico gratuito es gastarle la cuota
+# para resolver sitios que no existen. Lo que se comprueba aqui es el recorrido,
+# y el recorrido no depende de la direccion.
+export GEOCODE_ENABLED="false"
 
 echo "Levantando el stack con el Telegram falso…"
 docker compose --profile e2e up -d

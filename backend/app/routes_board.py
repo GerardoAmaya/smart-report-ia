@@ -73,6 +73,18 @@ def listar_casos(
         else_=3,
     )
 
+    # La direccion del caso es la del primer reporte que tenga una. No se
+    # guarda en el caso: el caso es un centroide que se mueve al entrar cada
+    # reporte, y una direccion que se recalcula cambiaria de nombre sola.
+    direccion = (
+        select(Report.address_text)
+        .where(Report.case_id == Case.id, Report.address_text.is_not(None))
+        .order_by(Report.created_at)
+        .limit(1)
+        .correlate(Case)
+        .scalar_subquery()
+    )
+
     filas = session.execute(
         select(
             Case,
@@ -80,6 +92,7 @@ def listar_casos(
             func.count(func.distinct(Report.id))
             .filter(Report.grouping_status == "doubtful")
             .label("dudosos"),
+            direccion.label("direccion"),
         )
         .outerjoin(Report, Report.case_id == Case.id)
         .where(*condiciones)
@@ -99,8 +112,11 @@ def listar_casos(
                 "doubtful_count": dudosos,
                 "created_at": caso.created_at.isoformat(),
                 "updated_at": caso.updated_at.isoformat(),
+                # Puede faltar: el sitio no siempre tiene nombre, y el punto
+                # sigue estando en el mapa.
+                "address": direccion,
             }
-            for caso, reportes, dudosos in filas
+            for caso, reportes, dudosos, direccion in filas
         ]
     }
 
@@ -211,6 +227,7 @@ def detalle_del_caso(
             {
                 "id": str(reporte.id),
                 "caption": reporte.caption,
+                "address": reporte.address_text,
                 "grouping_status": reporte.grouping_status,
                 "created_at": reporte.created_at.isoformat(),
                 "lat": coords[0] if coords else None,

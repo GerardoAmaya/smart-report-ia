@@ -37,8 +37,8 @@ Este principio no se negocia: es lo que hace el sistema verificable.
 
 ## Estado
 
-**Fases 0, 1, 2 y 7 cerradas y verificadas. Fases 3 a 6 escritas.** Lo que
-existe:
+**Fases 0, 1, 2, 6 y 7 cerradas y verificadas. Fases 3, 4 y 5 escritas.** Lo
+que existe:
 
 - `InboundChannel` como contrato, con Telegram como primera implementación
 - Webhook con secreto, límites, tope de cuerpo y **cero llamadas de red salientes**
@@ -57,6 +57,12 @@ existe:
 - Veinte migraciones, una por tabla, y seeders versionados aparte
 - 198 pruebas y 9 recorridos en verde, CI en verde
 
+**La fase 6 se cerró el 15 de septiembre de 2026.** Un reporte real desde un
+teléfono recorrió todo —foto, ubicación, propuesta, confirmación, asignación,
+en curso, y cierre con foto del arreglo y la nota «Ya se asfaltó»— y los tres
+avisos volvieron al teléfono. Comprobado en los datos y no solo en la pantalla:
+caso `closed`, una foto de arreglo, tres notificaciones en `sent`.
+
 **Las fases 3, 4 y 5 no están cerradas**, y cada una espera una verificación que
 no se puede fabricar:
 
@@ -65,7 +71,7 @@ no se puede fabricar:
 | 3 — clasificación | 200 fotos etiquetadas: exactitud por categoría y matriz de confusión |
 | 4 — agrupación | 200 reportes agrupados a mano: las dos tasas por separado |
 | 5 — el tablero | Alguien que no vio el sistema mira un caso agrupado y lo entiende solo |
-| 6 — despacho | El ciclo completo con un reporte real: de la foto al aviso de cerrado |
+
 
 (La fase 7 sí está cerrada: sus pruebas corren en CI contra el sistema
 levantado, que es exactamente lo que pedía su verificación.)

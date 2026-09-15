@@ -238,6 +238,14 @@ responderle a cuatro personas con un solo arreglo.
 *Verificación:* el ciclo completo con un reporte real, desde la foto hasta el
 aviso de cerrado.
 
+**Cumplida el 15 de septiembre de 2026.** Un reporte mandado desde un teléfono
+—foto de una calle anegada en Mejicanos, ubicación por el botón nativo—
+recorrió todo: propuesta de categoría, confirmación por botón, asignación a una
+cuadrilla, «en curso», y cierre con foto del arreglo y la nota «Ya se asfaltó».
+Los tres avisos llegaron de vuelta al teléfono. Comprobado en los datos y no
+solo en la pantalla: el caso quedó `closed`, con una foto de arreglo y tres
+notificaciones en `sent`.
+
 ### Fase 7 — Tiempo real y pruebas extremo a extremo
 
 El tablero se actualiza sin recargar. Playwright cubriendo los tres recorridos:

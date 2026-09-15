@@ -1,4 +1,8 @@
-.PHONY: e2e e2e-up up down logs nuke migrate revision seed test lint fmt health tunnel webhook reports bench retention photos accuracy classifications grouping grouping-eval
+.PHONY: e2e e2e-up up down logs nuke migrate revision seed test lint fmt health tunnel webhook reports bench retention photos accuracy classifications grouping grouping-eval help
+
+help:          ## Esta lista
+	@grep -hE '^[a-z0-9-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 up:            ## Levanta base, almacenamiento, API y frontend desde cero
 	@test -f .env || cp .env.example .env
@@ -7,16 +11,16 @@ up:            ## Levanta base, almacenamiento, API y frontend desde cero
 	@echo "Web    http://localhost:3100"
 	@echo "MinIO  http://localhost:9001"
 
-down:
+down:         ## Baja los contenedores, conserva los datos
 	docker compose down
 
 nuke:          ## Borra tambien los datos
 	docker compose down -v
 
-logs:
+logs:         ## Sigue los registros de la API y el frontend
 	docker compose logs -f api web
 
-migrate:
+migrate:      ## alembic upgrade head
 	docker compose exec api alembic upgrade head
 
 revision:      ## make revision m="mensaje"
@@ -25,7 +29,7 @@ revision:      ## make revision m="mensaje"
 seed:          ## Datos de siembra. Idempotente: se puede correr siempre.
 	docker compose exec api python -m seeders.runner
 
-test:
+test:         ## pytest contra la base de pruebas
 	docker compose exec api pytest -q
 
 e2e:           ## Pruebas extremo a extremo contra el sistema levantado
@@ -34,16 +38,16 @@ e2e:           ## Pruebas extremo a extremo contra el sistema levantado
 e2e-up:        ## Solo levanta el sistema con el Telegram falso
 	@./scripts/e2e.sh --solo-levantar
 
-lint:
+lint:         ## ruff, ESLint y tsc --noEmit
 	docker compose exec api ruff check .
 	docker compose exec web npm run lint
 	docker compose exec web npm run typecheck
 
-fmt:
+fmt:          ## Formatea y arregla lo que se pueda solo
 	docker compose exec api ruff format .
 	docker compose exec api ruff check --fix .
 
-health:
+health:       ## /health formateado
 	@curl -s http://localhost:8000/health | python3 -m json.tool
 
 bench:         ## Mide el costo por foto con 100 fotos calibradas

@@ -31,7 +31,22 @@ marca como dudoso, con el motivo, esperando a una persona.
 
 ## Cómo se ve
 
-El tablero, con datos reales de un reporte mandado desde un teléfono.
+### Para quien reporta
+
+Un hueco anegado en Mejicanos. Foto, ubicación por el botón nativo de Telegram,
+y listo: menos de un minuto, sin instalar nada.
+
+![Conversación con el bot: foto del problema y petición de la ubicación](docs/capturas/bot-reportar.jpg)
+
+Y lo que casi nadie construye: **el aviso de vuelta**, a todos los que
+reportaron y no solo al primero. Cada mensaje dice cuál de sus reportes es
+—cuándo lo mandó y dónde— porque la categoría sola no lo distingue.
+
+![El bot avisando: asignado, en curso, y resuelto con la nota del operador](docs/capturas/bot-ciclo.jpg)
+
+### Para quien despacha
+
+El tablero, con datos reales del mismo reporte.
 
 ![La cola de casos, métricas y la entrada de reportes en el tiempo](docs/capturas/tablero-resumen.png)
 
@@ -46,8 +61,8 @@ puntos iguales tira a la basura justo la información que importa.
 
 ![Mapa de casos sobre San Salvador](docs/capturas/tablero-mapa.jpg)
 
-> Las capturas se regeneran con `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`,
-> contra lo que haya en la base. No inventan datos.
+> Las del tablero se regeneran con `cd frontend && DEMO_PASSWORD=… node
+> scripts/capturas.mjs`, contra lo que haya en la base. No inventan datos.
 
 ## Estado
 

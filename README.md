@@ -4,13 +4,88 @@ Sistema de reportes ciudadanos de hallazgos en la vía pública de El Salvador.
 Alguien ve un hueco en la calle, le manda una foto a un bot de Telegram, y la
 cuadrilla lo ve agrupado con los otros tres que reportaron lo mismo.
 
+Hay dos personas con necesidades opuestas. **Quien reporta** está parado frente
+al problema, con prisa, y tiene que poder reportar en menos de un minuto sin
+instalar nada. **Quien despacha** mira el sistema ocho horas, y su problema no
+es recibir reportes sino saber cuáles son el mismo. El sistema existe para la
+segunda; la primera es el sensor.
+
 El alcance, las fases y las decisiones ya tomadas están en [`PLAN.md`](PLAN.md).
 
-**Estado: fase 7 — tiempo real y pruebas extremo a extremo.** El tablero se
-actualiza solo, y los tres recorridos —reportar, agrupar y despachar,
-cerrar— se prueban contra el sistema levantado en cada commit.
+---
+
+## Qué hace
+
+```
+ foto + ubicación        el modelo propone          el código decide
+ por Telegram      →     categoría y urgencia   →   si es el mismo caso   →  cuadrilla
+      ↑                  (la persona confirma)      (distancia y foto)         │
+      └──────────────  aviso de vuelta a todos los que reportaron  ───────────┘
+```
+
+El principio que sostiene todo: **el modelo propone, el código decide, y lo que
+no se puede sostener se informa.** El modelo clasifica y sugiere; no asigna
+cuadrillas ni cierra casos. La agrupación la decide código con umbrales
+medidos, muestra su evidencia y se puede deshacer. Lo que queda en el límite se
+marca como dudoso, con el motivo, esperando a una persona.
+
+## Cómo se ve
+
+El tablero, con datos reales de un reporte mandado desde un teléfono.
+
+![La cola de casos, métricas y la entrada de reportes en el tiempo](docs/capturas/tablero-resumen.png)
+
+Un caso abierto: la foto de quien reportó, la dirección resuelta, y el panel de
+despacho —que no deja cerrar sin foto del arreglo, porque un cierre sin
+evidencia es una afirmación que nadie puede comprobar.
+
+![Detalle de un caso con su foto, dirección y el panel de despacho](docs/capturas/tablero-caso.png)
+
+El mapa. El tamaño del pin dice cuántas personas reportan lo mismo: un mapa de
+puntos iguales tira a la basura justo la información que importa.
+
+![Mapa de casos sobre San Salvador](docs/capturas/tablero-mapa.jpg)
+
+> Las capturas se regeneran con `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`,
+> contra lo que haya en la base. No inventan datos.
+
+## Estado
+
+| Fase | | |
+|---|---|---|
+| 0 · Esqueleto | cerrada | |
+| 1 · El canal | cerrada | webhook, límites, cero llamadas salientes |
+| 2 · Almacenamiento | cerrada | miniaturas, huella perceptual, retención |
+| 3 · Clasificación | **abierta** | falta la muestra de 200 fotos etiquetadas |
+| 4 · Agrupación | **abierta** | faltan 200 reportes agrupados a mano |
+| 5 · El tablero | **abierta** | falta que alguien que no lo vio lo entienda solo |
+| 6 · Despacho y cierre | **abierta** | hecho el ciclo real; falta repetirlo hasta el cierre |
+| 7 · Tiempo real y E2E | cerrada | SSE sobre `LISTEN/NOTIFY`, 9 recorridos en CI |
+| 8 · Despliegue | escrita | corre en local; falta ponerla en un servidor |
+
+Las fases abiertas lo están porque **sus verificaciones piden datos que todavía
+no existen**, no porque falte código: el que las mide está escrito y avisa
+cuando la muestra no alcanza en vez de dar un número. Una fase sin verificación
+es una fase que alguien cree que terminó.
 
 ---
+
+## Con qué está hecho
+
+| | |
+|---|---|
+| **Backend** | FastAPI · SQLAlchemy 2 · Alembic · Python 3.13 |
+| **Base** | PostgreSQL 17 con PostGIS 3.5 — también hace de cola y de bus de eventos |
+| **Modelo** | Anthropic `claude-haiku-4-5`, con salida por esquema |
+| **Canal** | python-telegram-bot, usado como **biblioteca y no como framework** |
+| **Almacenamiento** | S3-compatible: MinIO en local, R2 al desplegar |
+| **Tablero** | Next.js 16 · shadcn/ui · MapLibre · TanStack Query |
+| **Pruebas** | pytest y Playwright contra el sistema levantado |
+
+Sin Redis y sin bus de mensajes: la cola es una tabla con `FOR UPDATE SKIP
+LOCKED` y los avisos al tablero salen de `LISTEN/NOTIFY`. Un segundo almacén es
+infraestructura que hay que desplegar, vigilar y explicar; cuando el volumen lo
+justifique, se cambia el adaptador.
 
 ## Arrancar
 
@@ -51,7 +126,7 @@ deja sembrados los canales conocidos y se puede correr las veces que sea.
 | `make classifications` | cola de clasificación |
 | `make grouping` | casos y la evidencia de cada unión |
 | `make grouping-eval f=…` | las dos tasas de agrupación |
-| `make e2e` | los tres recorridos contra el sistema levantado |
+| `make e2e` | los nueve recorridos contra el sistema levantado |
 | `make health` | `/health` formateado |
 | `make nuke` | baja todo y borra los datos |
 
@@ -405,7 +480,24 @@ molestado por el sistema.
 
 **El mensaje habla de *su* reporte, no del caso.** Quien reportó un hueco no
 sabe que existe un «caso 4f2a» ni por qué su foto está junto a otras tres. El
-agrupamiento es un detalle del sistema, no de su problema.
+agrupamiento es un detalle del sistema, no de su problema. Y dice **cuál** de
+sus reportes es, porque la categoría sola no lo distingue: quien reportó dos
+fugas en la misma semana recibiría dos veces «tu reporte sobre el agua».
+
+```
+Tu reporte sobre el agua o drenaje ya fue asignado a Cuadrilla 2.
+Te aviso cuando esté resuelto.
+
+Es el que mandaste el lunes 14 de septiembre, 5:18 p. m., en Alameda
+Presidente Doctor Manuel Enrique Araujo, Colonia San Francisco, San Salvador.
+Este es el punto: https://maps.google.com/?q=13.685892,-89.238082
+```
+
+La dirección se resuelve aparte y se guarda; **el punto es el dato y la
+dirección la comodidad**, así que si una falta, falta la de encima. Se arma de
+calle, colonia y ciudad, nunca del nombre del lugar que devuelve el
+geocodificador: «Megacentro de Vacunación» como dirección de un bache manda a
+la cuadrilla a mirar la puerta equivocada.
 
 **No se cierra sin foto del arreglo.** Un cierre sin evidencia es una afirmación
 que nadie puede comprobar, y el tablero existe para que las afirmaciones se
@@ -455,7 +547,7 @@ sirve una foto y guarda los mensajes, para no necesitar una cuenta ni fotos
 reales en cada corrida. El código que corre es el mismo de producción, incluido
 el cliente de Telegram; lo que cambia es una variable de entorno.
 
-Los tres recorridos que pide `PLAN.md`:
+Los tres caminos que pide `PLAN.md`, en nueve recorridos:
 
 | | |
 |---|---|
@@ -493,6 +585,15 @@ Dos decisiones que conviene no revertir sin pensarlo:
   El estado va en el cuerpo, no en el código HTTP.
 - **El sondeo al modelo se cachea 60 segundos.** `/health` puede consultarse
   cada pocos segundos; sin caché eso es cuota y latencia regaladas.
+
+## Desplegar
+
+Hoy corre en local. El material para ponerlo en un servidor está escrito y
+probado —imágenes de producción, compose con Caddy, respaldo diario y retención
+como servicio— en [`DESPLIEGUE.md`](DESPLIEGUE.md).
+
+Todo el software del despliegue es gratuito y permanente. El **único costo real
+del sistema es el modelo**: USD 0,0018 por foto.
 
 ## Métricas
 

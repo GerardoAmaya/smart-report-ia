@@ -74,7 +74,12 @@ El código que mide las tres existe y **avisa cuando la muestra no alcanza** en
 vez de dar un número. Las etiquetas de la fase 3 se juntan solas: cada
 confirmación en el bot es una.
 
-**Siguiente: fase 8 — despliegue.**
+**Fase 8 escrita, sin desplegar todavia.** Existen las imagenes de produccion,
+el compose del servidor con Caddy, el respaldo diario a R2, la retencion como
+servicio, el guion de registro del webhook y `DESPLIEGUE.md`. Falta lo que solo
+se puede hacer con las cuentas creadas: levantarlo y correr su verificacion —un
+reporte real de punta a punta sobre el sistema desplegado, y el costo por
+reporte medido.
 
 ## Decisiones tomadas
 
@@ -442,6 +447,58 @@ que la revision viene en camino.
 un guion bajo suelto hace que Telegram rechace el mensaje entero con 400. Los
 asteriscos se quitaron; la negrita no vale el mensaje perdido.
 
+**Por ahora corre en local; el material de despliegue queda escrito.** Se
+decidio no desplegar todavia, no por falta de material sino porque el camino
+gratuito pide una tarde de cuentas y firewall. Lo escrito no se borra: cuando
+haya tiempo se levanta. Si en algun momento se prefiere pagar por simplicidad,
+lo mas simple hoy es **Railway** —5 USD al mes con 5 de consumo incluido, y
+cobra por uso, asi que con cuatro servicios chicos la cuenta real ronda los 5 a
+10—; tiene plantilla de un clic con `postgis/postgis:17-3.5`, las mismas
+versiones de aqui. Ojo con cual: la variante con pgbouncer **rompe el tablero en
+vivo**, porque un pooler en modo transaccion no deja pasar `LISTEN/NOTIFY`.
+
+**Las capturas del README las saca un guion, no una mano.** `frontend/scripts/
+capturas.mjs`, contra lo que haya en la base. Unas capturas que no se pueden
+rehacer envejecen con el primer cambio de diseño, y un README con capturas
+viejas miente sobre lo que el proyecto es. Corre en el host y no en el
+contenedor, igual que las pruebas E2E: el navegador tiene que alcanzar la API
+en localhost:8000, y dentro del contenedor ese localhost es otro.
+
+**El despliegue es una maquina con el compose, no un proveedor administrado.**
+Sale gratis y permanente —Oracle Always Free, R2, DuckDNS, Caddy— y el unico
+costo del sistema pasa a ser el modelo, USD 0,0018 por foto. Lo que se acepta a
+cambio esta escrito: si la maquina cae, cae todo, y los respaldos son nuestros.
+
+**PostGIS en el servidor no es la imagen oficial.** Esa no publica arm64 —lo
+mismo que en la Mac— y la maquina gratuita es ARM. `imresamu/postgis` es el
+espejo multiarquitectura del mismo proyecto. Verificado contra Docker Hub, no
+de memoria.
+
+**Las imagenes de produccion son otras, y CI las construye.** Las de desarrollo
+montan el codigo, instalan pytest y ruff, y la del tablero arranca con
+`next dev`, que no puede salir a internet. Las de produccion compilan una vez y
+corren sin root. Como nada mas las usa, sin un trabajo de CI que las construya
+se pudririan calladas y el fallo aparaceria el dia del despliegue, con prisa.
+Ese trabajo tambien comprueba que `pg_dump` este en la imagen y que el worker
+de MapLibre llegue a `public/`, que son las dos ausencias que no darian error.
+
+**Un solo origen detras de Caddy.** `/health`, `/auth`, `/board` y `/webhooks`
+van a la API y el resto al tablero. Con dos origenes habria que configurar CORS
+y la cookie de sesion viajaria entre sitios: dos fuentes de fallos que solo
+aparecen en produccion. Tambien decide `NEXT_PUBLIC_API_URL=""` en el build,
+porque esa variable se hornea en el bundle del navegador.
+
+**La retencion y el respaldo corren dentro del despliegue**, como un servicio
+mas, no en un cron del servidor. Mismo motivo que las migraciones en
+`start.sh`: lo que hay que acordarse de configurar aparte es lo que un dia no
+esta y falla callado. Aqui sale en `docker compose ps`. El respaldo corre
+tambien al arrancar: si esta roto, se sabe al desplegar y no veinticuatro horas
+despues.
+
+**El respaldo va a R2 y no al disco de al lado.** Un respaldo en la misma
+maquina protege del error humano, no del incendio, y aqui todo vive en una
+maquina.
+
 **Dos formas de entrar (fase 5):** Google para uso normal y contraseña para un
 usuario de prueba público. Google dice quién es, no si puede entrar: la
 autorización es una tabla de correos permitidos con su rol. La contraseña del
@@ -565,9 +622,6 @@ contra el segundo error, no contra el promedio de los dos.
   la exige en lo que se publique derivado de ellos. El tablero ya la lleva en
   el mapa; el aviso de Telegram no dice de donde sale la calle. Antes de
   desplegar hay que decidir si ahi tambien va, y donde.
-- **La retención se corre a mano.** No hay tarea programada todavía; en la
-  fase 8 tiene que entrar al despliegue o la política queda escrita y sin
-  aplicar, que es peor que no tenerla.
 - **Un `asyncio.run` por foto en el trabajador.** Monta un bucle de eventos
   por descarga. Es invisible al lado de la red, pero si algún día se procesan
   miles por minuto, ahí está.

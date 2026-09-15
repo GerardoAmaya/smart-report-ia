@@ -1,0 +1,36 @@
+# Un solo origen para el tablero y la API.
+#
+# No es comodidad: con origenes distintos hay que configurar CORS y la cookie
+# de sesion viaja entre sitios, que son dos fuentes de fallos que solo
+# aparecen en produccion. Aqui el navegador solo conoce un dominio.
+
+{$DOMINIO} {
+	encode gzip
+
+	# Lo que atiende la API. El resto —incluido todo lo que Next sirve— va al
+	# tablero. Se enumeran las rutas de la API y no al reves: una ruta nueva
+	# del tablero no deberia exigir tocar el proxy.
+	@api path /health /auth/* /board/* /webhooks/*
+	reverse_proxy @api api:8000 {
+		# El tablero en vivo es un flujo que no termina: sin esto Caddy
+		# esperaria la respuesta completa y no entregaria nada.
+		flush_interval -1
+	}
+
+	reverse_proxy web:3000
+
+	header {
+		# El navegador no vuelve a hablar por HTTP con este dominio.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	log {
+		output file /data/acceso.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

@@ -119,6 +119,41 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  imagenes:
+    # Las imagenes de produccion son **otras** que las de desarrollo, asi que
+    # nada de lo demas las compila. Sin esto se pudren calladas: un cambio en
+    # las dependencias o en la salida de Next rompe el despliegue y se descubre
+    # el dia que hay que desplegar, con prisa.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Imagen de la API
+        run: docker build -f backend/Dockerfile.prod -t smart-report-api:prod backend/
+
+      - name: La API arranca y trae pg_dump
+        # pg_dump es lo que usa el respaldo diario, y su ausencia no se notaria
+        # hasta que hiciera falta restaurar.
+        run: |
+          docker run --rm smart-report-api:prod sh -c \
+            'pg_dump --version && python -c "import app.main, app.backup, app.mantenimiento"'
+
+      - name: Imagen del tablero
+        run: docker build -f frontend/Dockerfile.prod -t smart-report-web:prod frontend/
+
+      - name: El tablero sirve lo compilado
+        # Incluido el worker de MapLibre, que vive en public/ y ya se perdio
+        # una vez: el mapa se montaba y no pedia una sola tesela, sin error.
+        run: |
+          docker run -d --name web -p 3000:3000 smart-report-web:prod
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/ >/dev/null && break || sleep 1
+          done
+          curl -sf http://localhost:3000/ >/dev/null
+          curl -sf http://localhost:3000/maplibre/maplibre-gl-worker.mjs >/dev/null
+          docker rm -f web
+
   e2e:
     # **No corre en cada commit: se lanza a mano.**
     #

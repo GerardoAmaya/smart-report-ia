@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .env
 .env.local
+# Los secretos del servidor. La plantilla .env.prod.example si va.
+.env.prod
 .ruff_cache/
 .pytest_cache/
 node_modules/

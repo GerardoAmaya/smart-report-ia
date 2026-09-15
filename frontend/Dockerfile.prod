@@ -1,0 +1,37 @@
+# Imagen de produccion del tablero.
+#
+# La de desarrollo arranca con `npm run dev`, que **no puede salir a internet**:
+# recompila al vuelo, sirve mapas de codigo y no aplica ninguna de las
+# optimizaciones del build. Esta compila una vez y sirve lo compilado.
+FROM node:24-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+FROM node:24-slim AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# La URL de la API se hornea en el bundle del navegador, asi que se decide
+# aqui. Vacia significa "el mismo origen": Caddy manda /board, /auth y
+# /webhooks a la API y el resto al tablero. Asi no hay CORS que configurar ni
+# cookie entre sitios, que son dos fuentes de fallos en produccion.
+ENV NEXT_PUBLIC_API_URL=""
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+FROM node:24-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+
+# La salida `standalone` trae solo lo que el servidor necesita: sin ella
+# habria que copiar node_modules entero, que aqui son cientos de megabytes.
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+
+RUN useradd --system --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 3000
+CMD ["node", "server.js"]

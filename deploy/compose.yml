@@ -1,0 +1,98 @@
+# Despliegue. Aparte del compose de desarrollo a proposito: aquel monta el
+# codigo, expone puertos al host y trae MinIO; este compila imagenes, no expone
+# nada mas que Caddy y habla con R2.
+#
+#   docker compose -f deploy/compose.yml --env-file .env.prod up -d --build
+#
+# Todo vive en una maquina. Es lo que permite que el costo sea cero, y tambien
+# lo que hay que saber: si la maquina cae, cae el sistema entero.
+
+services:
+  db:
+    # No es la imagen oficial de PostGIS: esa **no publica arm64**, y la
+    # maquina gratuita de Oracle es ARM. `imresamu/postgis` es el espejo
+    # multiarquitectura del mismo proyecto, con las mismas versiones.
+    image: imresamu/postgis:17-3.5-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sin `ports`: la base no se asoma a internet. Quien la necesita esta en
+    # esta misma red. Un Postgres con el 5432 abierto lo encuentran solo.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file: [../.env.prod]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      ENVIRONMENT: production
+    depends_on:
+      db: {condition: service_healthy}
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    env_file: [../.env.prod]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      ENVIRONMENT: production
+    depends_on:
+      db: {condition: service_healthy}
+
+  mantenimiento:
+    # Retencion y respaldo. Van **dentro** del despliegue y no en un cron del
+    # servidor por el mismo motivo por el que las migraciones van en start.sh:
+    # lo que hay que acordarse de configurar aparte es lo que un dia no esta.
+    # Aqui aparece en `docker compose ps` y sus registros estan con los demas.
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: ["python", "-m", "app.mantenimiento"]
+    env_file: [../.env.prod]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      ENVIRONMENT: production
+    depends_on:
+      db: {condition: service_healthy}
+
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on: [api]
+
+  caddy:
+    # El unico que se asoma a internet. Saca y renueva el certificado solo.
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api, web]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

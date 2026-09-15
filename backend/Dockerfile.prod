@@ -1,0 +1,35 @@
+# Imagen de produccion. Aparte de la de desarrollo a proposito: aquella monta
+# el codigo, instala las herramientas de prueba y recarga al guardar. Eso en un
+# servidor publico es peso y superficie de ataque de mas.
+FROM python:3.13-slim AS deps
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+WORKDIR /app
+
+# Sin el extra `dev`: pytest y ruff no pintan nada en produccion.
+COPY pyproject.toml ./
+RUN mkdir -p app && touch app/__init__.py \
+    && pip install --no-cache-dir --prefix=/instalado .
+
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+WORKDIR /app
+
+# `pg_dump` para el respaldo diario. Es el cliente, no el servidor: unos pocos
+# megabytes y evita una imagen aparte solo para volcar la base.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=deps /instalado /usr/local
+COPY . .
+
+# Sin root. Si alguien consigue ejecutar algo aqui dentro, que sea con los
+# permisos de nadie: el contenedor no necesita escribir en su propio codigo.
+RUN useradd --system --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+CMD ["sh", "./start.sh"]

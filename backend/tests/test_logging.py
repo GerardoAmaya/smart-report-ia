@@ -13,7 +13,10 @@ import logging
 
 from app.logging_setup import RedactaSecretos, configure
 
-TOKEN_FALSO = "8844248832:AAGvOksIcro1TaPX7lzzuSOcElmouS2adcM"
+# Inventado y armado al vuelo: con la forma escrita de un token de verdad,
+# los rastreadores de secretos lo tomarian por uno. Aqui estuvo el token real
+# del bot, copiado de un log, y se filtro por el repositorio publico.
+TOKEN_FALSO = "123456789:" + "A" * 35
 
 
 def _registro(mensaje: str, *args) -> logging.LogRecord:

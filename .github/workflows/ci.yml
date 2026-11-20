@@ -39,6 +39,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Sin credenciales en el repositorio
+        # El token del bot estuvo en una prueba y se filtro por el repositorio
+        # publico. La suite revisa backend/; esto revisa todo lo versionado.
+        # Se imprime el archivo y nunca la linea: el registro de CI es publico.
+        working-directory: .
+        run: |
+          if git grep -l -E '\b[0-9]{8,10}:[A-Za-z0-9_-]{35}\b|sk-ant-[A-Za-z0-9_-]{20,}'; then
+            echo "Hay credenciales en esos archivos." >&2
+            exit 1
+          fi
+
       - name: Almacenamiento de objetos
         # MinIO como paso y no como service: la imagen pide el argumento
         # "server", y services no deja cambiar el comando comodamente. Sin esto

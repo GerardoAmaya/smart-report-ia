@@ -26,6 +26,15 @@ PASSWORD = "contraseña-de-prueba-larga"
 def demo_configurado(monkeypatch):
     monkeypatch.setattr(settings, "demo_password", SecretStr(PASSWORD))
     monkeypatch.setattr(settings, "demo_email", "demo@smart-report.local")
+    # El de produccion, fijado: el contenedor de desarrollo lo trae encendido y
+    # estas pruebas no pueden depender del entorno donde corren.
+    monkeypatch.setattr(settings, "demo_can_dispatch", False)
+
+
+@pytest.fixture
+def invitado_despacha(monkeypatch):
+    """Como en desarrollo y en las E2E; en produccion va apagado."""
+    monkeypatch.setattr(settings, "demo_can_dispatch", True)
 
 
 @pytest.fixture
@@ -101,7 +110,7 @@ def test_el_usuario_de_prueba_no_puede_borrar(client, session, caso):
     assert caso.status == "open"
 
 
-def test_el_usuario_de_prueba_si_puede_despachar(client, session, caso):
+def test_con_el_interruptor_el_invitado_despacha(client, session, caso, invitado_despacha):
     entrar_de_prueba(client)
 
     r = client.post(f"/board/cases/{caso.id}/status?nuevo=assigned")
@@ -111,7 +120,7 @@ def test_el_usuario_de_prueba_si_puede_despachar(client, session, caso):
     assert caso.status == "assigned"
 
 
-def test_el_usuario_de_prueba_si_puede_separar(client, session, caso):
+def test_con_el_interruptor_el_invitado_separa(client, session, caso, invitado_despacha):
     entrar_de_prueba(client)
     reporte = session.execute(select(Report).where(Report.case_id == caso.id)).scalar_one()
 
@@ -120,6 +129,33 @@ def test_el_usuario_de_prueba_si_puede_separar(client, session, caso):
     assert r.status_code == 200
     session.refresh(reporte)
     assert reporte.case_id != caso.id
+
+
+def test_por_defecto_el_invitado_solo_mira(client, session, caso):
+    """La contraseña del invitado va en el README publico y el tablero es produccion.
+
+    Si pudiera despachar, cualquiera cerraria un caso real y el bot le avisaria
+    al ciudadano que se resolvio sin que nadie fuera. Mirar si: es para eso.
+    """
+    entrar_de_prueba(client)
+
+    assert client.get("/board/cases").status_code == 200
+    assert client.get(f"/board/cases/{caso.id}").status_code == 200
+    assert client.get("/auth/yo").json()["permissions"] == ["ver"]
+
+    reporte = session.execute(select(Report).where(Report.case_id == caso.id)).scalar_one()
+    assert client.post(f"/board/cases/{caso.id}/status?nuevo=assigned").status_code == 403
+    assert client.post(f"/board/reports/{reporte.id}/ungroup").status_code == 403
+    # Y nada cambio: no basta con que devuelva 403.
+    session.refresh(caso)
+    session.refresh(reporte)
+    assert caso.status == "open"
+    assert reporte.case_id == caso.id
+
+
+def test_con_el_interruptor_el_invitado_tampoco_borra(client, session, caso, invitado_despacha):
+    entrar_de_prueba(client)
+    assert client.delete(f"/board/cases/{caso.id}").status_code == 403
 
 
 def test_el_administrador_si_puede_borrar(client, session, admin, caso):
@@ -231,12 +267,14 @@ def test_los_permisos_por_rol_son_los_declarados():
     assert puede(Role.ADMIN.value, Permission.BORRAR)
     assert not puede(Role.OPERATOR.value, Permission.BORRAR)
     assert not puede(Role.DEMO.value, Permission.BORRAR)
-    assert puede(Role.DEMO.value, Permission.DESPACHAR)
+    # El invitado solo mira salvo que se encienda el interruptor.
+    assert not puede(Role.DEMO.value, Permission.DESPACHAR)
+    assert puede(Role.DEMO.value, Permission.VER)
     # Un rol que no existe no hereda nada.
     assert not puede("superusuario", Permission.VER)
 
 
-def test_yo_dice_que_puedo(client):
+def test_yo_dice_que_puedo(client, invitado_despacha):
     entrar_de_prueba(client)
     cuerpo = client.get("/auth/yo").json()
 

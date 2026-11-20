@@ -37,6 +37,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       DEMO_EMAIL: ${DEMO_EMAIL:-demo@smart-report.local}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      # Encendido aqui y apagado en produccion: las E2E y el guion de capturas
+      # recorren el ciclo de despacho entrando como invitado.
+      DEMO_CAN_DISPATCH: ${DEMO_CAN_DISPATCH:-true}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3100}
       ENVIRONMENT: ${ENVIRONMENT:-dev}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

@@ -26,6 +26,8 @@ PASSWORD = "clave-del-despacho"
 @pytest.fixture(autouse=True)
 def demo(monkeypatch):
     monkeypatch.setattr(settings, "demo_password", SecretStr(PASSWORD))
+    # Estas pruebas despachan como invitado, como en desarrollo y en las E2E.
+    monkeypatch.setattr(settings, "demo_can_dispatch", True)
 
 
 @pytest.fixture

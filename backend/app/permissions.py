@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from app.config import settings
+
 
 class Role(StrEnum):
     ADMIN = "admin"
@@ -30,24 +32,38 @@ class Permission(StrEnum):
     BORRAR = "borrar"
 
 
-# **El usuario de prueba no puede borrar.** Va a entrar gente a tocar todo, que
-# para eso esta: que asigne, agrupe, separe y cierre; que no vacie la base. Es
-# una condicion en el rol y ahorra restaurar un respaldo.
+# **El usuario de prueba solo mira, salvo que se encienda `demo_can_dispatch`.**
+# Su contraseña va en el README publico y el tablero es produccion: con despacho,
+# cualquiera podria cerrar un caso real y el bot le avisaria al ciudadano que se
+# resolvio sin que nadie fuera. Desarrollo y las E2E lo encienden para recorrer
+# el ciclo con el invitado. Borrar no lo puede nunca, ni con el interruptor.
 #
-# `demo` y `operator` tienen hoy los mismos permisos. Se mantienen separados
-# para poder restringir al de prueba mas adelante sin tocar a los operadores ni
-# migrar nada.
+# Es un rol aparte de `operator` justo para esto: restringir al invitado sin
+# tocar a los operadores ni migrar nada.
 PERMISOS: dict[Role, frozenset[Permission]] = {
     Role.ADMIN: frozenset({Permission.VER, Permission.DESPACHAR, Permission.BORRAR}),
     Role.OPERATOR: frozenset({Permission.VER, Permission.DESPACHAR}),
-    Role.DEMO: frozenset({Permission.VER, Permission.DESPACHAR}),
+    Role.DEMO: frozenset({Permission.VER}),
 }
 
 
-def puede(role: str, permiso: Permission) -> bool:
+def permisos_de(role: str) -> frozenset[Permission]:
+    """Los permisos efectivos del rol, con el interruptor del invitado aplicado.
+
+    Unico sitio que decide: `puede()` y el perfil que recibe el tablero salen
+    de aqui, asi la interfaz nunca ofrece un boton que la API va a rechazar.
+    """
     try:
-        return permiso in PERMISOS[Role(role)]
+        rol = Role(role)
     except ValueError:
         # Un rol que no existe no puede nada. Falla cerrado: si alguien mete un
         # rol nuevo en la base y olvida declararlo aqui, no hereda permisos.
-        return False
+        return frozenset()
+    base = PERMISOS[rol]
+    if rol is Role.DEMO and settings.demo_can_dispatch:
+        return base | {Permission.DESPACHAR}
+    return base
+
+
+def puede(role: str, permiso: Permission) -> bool:
+    return permiso in permisos_de(role)

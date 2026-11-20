@@ -172,6 +172,11 @@ class Settings(BaseSettings):
     # para siempre, y cuando haga falta cambiarla ya no se puede.
     demo_email: str = "demo@smart-report.local"
     demo_password: SecretStr = SecretStr("")
+    # Si el invitado puede despachar. Apagado por defecto: su contraseña va en
+    # el README publico, y con despacho cualquiera podria cerrar un caso real y
+    # el bot le avisaria al ciudadano que se resolvio sin que nadie fuera.
+    # Desarrollo y las E2E lo encienden: recorren el ciclo con el invitado.
+    demo_can_dispatch: bool = False
 
     # Correos de los administradores, separados por coma. Lo siembra el
     # seeder. Varios porque una persona suele tener mas de una cuenta, y

@@ -23,6 +23,8 @@ LAT0, LON0 = 13.6929, -89.2182
 @pytest.fixture(autouse=True)
 def demo(monkeypatch):
     monkeypatch.setattr(settings, "demo_password", SecretStr(PASSWORD))
+    # Estas pruebas despachan como invitado, como en desarrollo y en las E2E.
+    monkeypatch.setattr(settings, "demo_can_dispatch", True)
 
 
 @pytest.fixture

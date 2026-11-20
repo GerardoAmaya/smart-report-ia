@@ -13,7 +13,7 @@ from app import auth
 from app.config import settings
 from app.db import SesionBD
 from app.models import User
-from app.permissions import PERMISOS, Role
+from app.permissions import permisos_de
 
 log = logging.getLogger("smart_report.auth")
 
@@ -141,7 +141,7 @@ def yo(usuario: Annotated[User, Depends(auth.current_user)]) -> dict:
 
 
 def _perfil(usuario: User) -> dict:
-    permisos = PERMISOS.get(Role(usuario.role), frozenset())
+    permisos = permisos_de(usuario.role)
     return {
         "email": usuario.email,
         "role": usuario.role,

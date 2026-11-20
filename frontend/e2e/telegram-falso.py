@@ -121,7 +121,11 @@ class Manejador(BaseHTTPRequestHandler):
                 {"file_id": "x", "file_unique_id": "u", "file_size": len(FOTO), "file_path": "photos/f.jpg"}
             )
 
-        if metodo == "sendMessage":
+        # La reescritura del mensaje se guarda como un envio mas: desde que una
+        # eleccion se contesta con `answerCallbackQuery` en el cuerpo y la
+        # reescritura detras, los botones de categoria viajan por aqui. Sin
+        # esto caian al `return` del final y la prueba no los veia nunca.
+        if metodo in ("sendMessage", "editMessageText"):
             largo = int(self.headers.get("Content-Length") or 0)
             crudo = self.rfile.read(largo).decode() if largo else ""
             ENVIADOS.append(_interpretar(crudo))

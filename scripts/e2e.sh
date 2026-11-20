@@ -16,7 +16,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 [[ -f .env ]] || { echo "Falta .env. Copiar de .env.example." >&2; exit 1; }
-set -a; . ./.env; set +a
+# Se leen las dos que hacen falta aqui; compose lee .env por su cuenta. Cargarlo
+# con `.` reventaba en GEOCODE_USER_AGENT, que lleva parentesis sin comillas:
+# el .env es para compose, no para bash. Las comillas de alrededor se quitan
+# porque compose tambien las quita.
+leer() { sed -n "s/^$1=//p" .env | tail -n 1 | sed -E 's/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'; }
+DEMO_PASSWORD="${DEMO_PASSWORD:-$(leer DEMO_PASSWORD)}"
+TELEGRAM_WEBHOOK_SECRET="${TELEGRAM_WEBHOOK_SECRET:-$(leer TELEGRAM_WEBHOOK_SECRET)}"
 
 [[ -n "${DEMO_PASSWORD:-}" ]] || {
   echo "DEMO_PASSWORD hace falta: las pruebas entran al tablero con el." >&2; exit 1; }

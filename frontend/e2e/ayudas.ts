@@ -30,12 +30,6 @@ type RespuestaConBotones = {
 };
 
 /** Los botones que trae una respuesta del webhook. */
-export function botonesDe(r: RespuestaConBotones): { texto: string; data: string }[] {
-  return (r.reply_markup?.inline_keyboard ?? [])
-    .flat()
-    .map((b) => ({ texto: b.text, data: b.callback_data }));
-}
-
 let siguienteUpdate = Date.now() % 1_000_000;
 const nuevoUpdateId = () => ++siguienteUpdate;
 
@@ -245,9 +239,11 @@ export async function reportarCompleto(
   // clasificar, que es una llamada fuera del webhook.
   const confirmar = await esperarBotones(api, usuario, "n:");
 
-  // Las categorias no: vienen en la respuesta del webhook, porque contestar a
-  // un boton no puede costar una llamada de red saliente.
-  const categorias = botonesDe(await pulsarBoton(api, usuario, confirmar[0].data));
+  // Las categorias llegan reescribiendo ese mismo mensaje, por detras del
+  // webhook: el cuerpo de la respuesta solo apaga el reloj del boton. Leerlas
+  // del cuerpo —como se hacia antes de ese cambio— no encuentra nada.
+  await pulsarBoton(api, usuario, confirmar[0].data);
+  const categorias = await esperarBotones(api, usuario, "c:");
   const elegida = categorias.find((b) => b.texto === etiqueta);
   if (!elegida) {
     throw new Error(

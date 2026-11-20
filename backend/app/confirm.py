@@ -40,6 +40,8 @@ ETIQUETA_SEVERIDAD: dict[str, str] = {
     Severity.BAJA: "sin urgencia",
 }
 
+SEVERIDAD_SIN_PROPUESTA = Severity.MEDIA
+
 YA_CONFIRMADO = "Ese reporte ya estaba confirmado."
 NO_ENCONTRADO = "No encuentro ese reporte."
 
@@ -75,6 +77,17 @@ def opciones_de_categoria(clasificacion: Classification) -> tuple[str, list[tupl
     ]
     opciones.append((ETIQUETAS[Category.NO_ES_REPORTE], f"{PREFIJO_CATEGORIA}{clasificacion.id}:x"))
     return texto, opciones
+
+
+def pedir_categoria(clasificacion: Classification) -> tuple[str, list[tuple[str, str]]]:
+    """Cuando no hubo propuesta, la persona elige desde el principio.
+
+    Los mismos botones que al corregir: la respuesta entra por el camino que ya
+    existe y no hay un segundo flujo que mantener. El texto no habla de modelos
+    ni de errores; para quien reporta, solo hace falta un dato mas.
+    """
+    _, opciones = opciones_de_categoria(clasificacion)
+    return "No pude revisar la foto automáticamente. ¿Qué tipo de problema es?", opciones
 
 
 def _resumen(clasificacion: Classification, encabezado: str, categoria: str) -> str:
@@ -158,19 +171,26 @@ def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[
                 return NO_ENCONTRADO, [], False
             categoria = reales[int(indice)]
 
+        sin_propuesta = clasificacion.proposed_category is None
         clasificacion.final_category = categoria.value
         # La severidad propuesta se conserva: la persona corrigio la categoria,
         # no dijo nada de la urgencia, e inventarle una seria ponerle palabras.
-        clasificacion.final_severity = clasificacion.proposed_severity
+        # Sin propuesta (el modelo fallo) va la intermedia: el caso necesita
+        # una para ordenarse en la cola, y la media ni lo entierra ni lo vuelve
+        # urgente sin que nadie lo haya visto. Quien despacha la ajusta.
+        clasificacion.final_severity = clasificacion.proposed_severity or (
+            SEVERIDAD_SIN_PROPUESTA.value
+        )
         clasificacion.status = "corrected"
         clasificacion.confirmed_at = datetime.now(UTC)
         _agrupar(session, clasificacion)
+        encabezado = (
+            "Anotado, gracias."
+            if sin_propuesta
+            else "Corregido, gracias. Eso ayuda a que el sistema mejore."
+        )
         return (
-            _resumen(
-                clasificacion,
-                "Corregido, gracias. Eso ayuda a que el sistema mejore.",
-                clasificacion.final_category,
-            ),
+            _resumen(clasificacion, encabezado, clasificacion.final_category),
             [],
             True,
         )

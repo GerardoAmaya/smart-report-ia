@@ -192,13 +192,33 @@ def run_once(session: Session) -> int:
             session.refresh(fila)
             mark_failure(session, fila, str(exc), permanente=True)
             session.commit()
+            _pedir_categoria_si_fallo(session, fila)
         except Exception as exc:
             session.rollback()
             session.refresh(fila)
             mark_failure(session, fila, f"{type(exc).__name__}: {exc}", permanente=False)
             session.commit()
+            _pedir_categoria_si_fallo(session, fila)
 
     return len(filas)
+
+
+def _pedir_categoria_si_fallo(session: Session, clasificacion: Classification) -> None:
+    """Si el modelo ya no va a contestar, la categoria la elige la persona.
+
+    Sin esto el reporte quedaba sin categoria para siempre: no se agrupa, no
+    aparece como caso, y el bot ya le habia dicho que la revision venia en
+    camino. Pasa sobre todo cuando se acaba el saldo del modelo.
+
+    Una sola vez: se llama justo cuando la fila pasa a `failed`, y de `failed`
+    no sale por la cola, asi que la siguiente pasada no la vuelve a ver.
+    """
+    if clasificacion.status != "failed":
+        return
+    from app import confirm
+
+    texto, opciones = confirm.pedir_categoria(clasificacion)
+    _enviar(session, clasificacion, texto, opciones)
 
 
 def _preguntar(session: Session, clasificacion: Classification) -> None:
@@ -208,16 +228,24 @@ def _preguntar(session: Session, clasificacion: Classification) -> None:
     no se puede confirmar, pero tampoco se pierde. Un fallo al avisar no tiene
     por que deshacer el trabajo del modelo, que ya se pago.
     """
+    from app import confirm
+
+    texto, opciones = confirm.pregunta(clasificacion)
+    _enviar(session, clasificacion, texto, opciones)
+
+
+def _enviar(
+    session: Session, clasificacion: Classification, texto: str, opciones: list[tuple[str, str]]
+) -> None:
+    """Manda una pregunta con botones a quien reporto, sin tumbar al trabajador."""
     import asyncio
 
-    from app import confirm
     from app.channels import get_channel
 
     reporte = session.get(Report, clasificacion.report_id)
     if reporte is None:
         return
 
-    texto, opciones = confirm.pregunta(clasificacion)
     canal = get_channel(reporte.channel)
     try:
         asyncio.run(canal.ask_out_of_band(reporte.external_user_id, texto, opciones))

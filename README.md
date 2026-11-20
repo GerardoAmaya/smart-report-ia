@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://smart-report-sv.duckdns.org/health"><img alt="En producción" src="https://img.shields.io/badge/producción-en%20línea-1f6f5c"></a>
-  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-250%20%2B%209%20E2E-1f6f5c">
+  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-275%20%2B%209%20E2E-1f6f5c">
   <img alt="Costo de infraestructura" src="https://img.shields.io/badge/infraestructura-USD%200%2Fmes-c77b23">
 </p>
 
@@ -66,8 +66,9 @@ Está en producción. Las dos mitades se pueden tocar:
 | 🩺 **Estado** | [`/health`](https://smart-report-sv.duckdns.org/health): base, esquema, modelo y almacenamiento |
 
 El usuario de prueba **solo mira**: cola, casos, mapa, métricas y la evidencia
-de cada agrupación. Despachar está reservado a operadores, porque los casos son
-reales y cerrar uno le avisa a quien lo reportó que ya se arregló.
+de cada agrupación, y puede hacerle **10 preguntas al día** al asistente.
+Despachar está reservado a operadores, porque los casos son reales y cerrar uno
+le avisa a quien lo reportó que ya se arregló.
 
 > Lo que mandes al bot aparece en el tablero. Si mandas una foto que no es de la
 > vía pública, el modelo la va a proponer como *no es un reporte*, que es lo
@@ -110,6 +111,10 @@ reportaron y no solo al primero. Cada mensaje dice cuál de sus reportes es
 
 ### Para quien despacha
 
+La entrada: Google para quien trabaja aquí, contraseña para quien viene a mirar.
+
+![Pantalla de entrada con el mapa de San Salvador de fondo](docs/capturas/entrada.jpg)
+
 El tablero en vivo: la cola de casos, las métricas y la entrada de reportes en
 el tiempo. Se actualiza solo, sin recargar.
 
@@ -125,6 +130,21 @@ El mapa. El tamaño del pin dice cuántas personas reportan lo mismo: un mapa de
 puntos iguales tira a la basura justo la información que importa.
 
 ![Mapa de casos sobre San Salvador](docs/capturas/tablero-mapa.jpg)
+
+**Pregúntale al tablero.** Un panel donde se escribe «¿qué quedó pendiente?» o
+«resumen de la semana», y el modelo contesta con los datos del sistema y
+enlaces a cada caso. **Solo puede mirar**: sus herramientas son consultas
+escritas en código, corren en una transacción de solo lectura, y asignar o
+cerrar sigue siendo cosa del panel de cada caso.
+
+![El asistente respondiendo qué casos urgentes quedan pendientes](docs/capturas/asistente.png)
+
+Y donde el sistema duda, una segunda mirada: en un reporte que quedó en el
+límite de la agrupación, **«Comparar las fotos»** le pide al modelo que mire las
+dos y diga en qué se parecen y en qué no. Da una sugerencia; decide la persona.
+
+Además: buscador con **Ctrl+K**, miniatura de cada foto en la cola, y un aviso
+en pantalla cada vez que se despacha algo, con a cuántas personas se les avisó.
 
 > Las capturas del tablero las saca un guion contra lo que haya en la base, no
 > una mano: `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`.
@@ -152,7 +172,7 @@ flowchart LR
     W -->|"avisos de vuelta"| TG
 ```
 
-Cinco decisiones que definen la forma del sistema:
+Seis decisiones que definen la forma del sistema:
 
 - **El webhook no hace ni una llamada de red saliente.** La respuesta a quien
   reporta viaja en el cuerpo de la propia respuesta HTTP. La foto, el modelo y
@@ -170,6 +190,9 @@ Cinco decisiones que definen la forma del sistema:
   juntar dos problemas distintos esconde uno.
 - **Si el modelo falla, el sistema sigue.** Sin saldo o sin servicio, el bot le
   pide la categoría a la persona con botones, y el reporte entra igual.
+- **El cierre lleva su prueba.** No se cierra sin foto del arreglo, solo se
+  puede con el caso en curso, y el aviso de «resuelto» le llega a quien reportó
+  **con esa foto**: quien vio el problema es quien mejor sabe si se arregló.
 
 El razonamiento completo, y lo que cada decisión costó descubrir, está en
 [`docs/DISENO.md`](docs/DISENO.md).
@@ -181,9 +204,10 @@ El razonamiento completo, y lo que cada decisión costó descubrir, está en
 | **API** | FastAPI · SQLAlchemy 2 · Alembic · Python 3.13 | tipos de punta a punta y migraciones versionadas |
 | **Base** | PostgreSQL 17 + PostGIS 3.5 | distancia geográfica real, y además cola y bus de eventos |
 | **Modelo** | Claude Haiku 4.5, con salida por esquema | no puede inventar una categoría: o cae en el enum o la llamada falla |
+| **Asistente** | Claude Haiku 4.5 con *tool use* de solo lectura | las consultas las escribe el código, no el modelo; el modelo solo elige cuál |
 | **Canal** | Telegram Bot API, detrás de una interfaz `InboundChannel` | sin instalar nada; WhatsApp sería otro adaptador, no un rediseño |
 | **Fotos** | Cloudflare R2 (S3), MinIO en local | el tablero sirve las mismas fotos ocho horas al día, y R2 no cobra salida |
-| **Tablero** | Next.js 16 · React 19 · TypeScript 6 · Tailwind 4 · shadcn/ui | |
+| **Tablero** | Next.js 16 · React 19 · TypeScript 6 · Tailwind 4 · shadcn/ui · cmdk · Sonner | |
 | **Mapa** | MapLibre 6 con teselas de OpenFreeMap | gratis, sin clave y sin límite de cargas |
 | **Datos en vivo** | TanStack Query + SSE | el tablero escucha y no habla: no hace falta WebSocket |
 | **Servidor** | Docker Compose · Caddy 2 · Oracle Cloud Always Free (ARM) | un solo origen con HTTPS automático, sin CORS |
@@ -222,9 +246,13 @@ Todo corre en una máquina, y todo lo que la rodea está en un nivel gratuito
 | Mapa y direcciones | OpenFreeMap y Nominatim | USD 0 |
 | Integración continua | GitHub Actions | USD 0 |
 | **Clasificar una foto** | Claude Haiku 4.5, con miniatura | **USD 0,0018** |
+| Una pregunta al asistente | Claude Haiku 4.5, con herramientas | USD 0,006 |
+| Comparar dos fotos dudosas | Claude Haiku 4.5 | USD 0,003 |
 
 El modelo es el único costo real, y por uso: mil fotos son menos de dos
-dólares. La foto es dos tercios de cada llamada, así que se le manda la
+dólares. El asistente tiene tope diario por persona —10 consultas el invitado,
+40 cada operador—, así que el acceso público no puede gastar más de unos
+USD 0,07 al día. La foto es dos tercios de cada llamada, así que se le manda la
 miniatura y no el original. Cómo se levanta todo, paso a paso y con lo que
 hace perder una tarde si no se sabe, está en [`DESPLIEGUE.md`](DESPLIEGUE.md).
 

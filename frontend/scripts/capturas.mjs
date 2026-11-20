@@ -11,6 +11,12 @@
  *
  *   cd frontend && DEMO_PASSWORD=... node scripts/capturas.mjs
  *
+ * `SOLO=entrada,asistente` rehace solo esas. Sirve cuando la base tiene datos
+ * de las pruebas E2E y no se quiere pisar las del tablero con ellos.
+ *
+ * La del asistente hace **una pregunta real al modelo** (unos USD 0,006): una
+ * respuesta inventada para la foto seria justo lo que este guion evita.
+ *
  * Sale lo que haya en la base de desarrollo. No inventa datos: una captura con
  * casos falsos es una promesa, y este proyecto mide en vez de prometer.
  */
@@ -20,6 +26,8 @@ import { chromium } from "@playwright/test";
 const BASE = process.env.BASE_URL ?? "http://localhost:3100";
 const PASSWORD = process.env.DEMO_PASSWORD;
 const DESTINO = process.env.DESTINO ?? "../docs/capturas";
+const SOLO = process.env.SOLO ? new Set(process.env.SOLO.split(",")) : null;
+const toca = (nombre) => !SOLO || SOLO.has(nombre);
 
 if (!PASSWORD) {
   console.error("Falta DEMO_PASSWORD: es la contraseña del usuario de prueba.");
@@ -45,6 +53,12 @@ try {
   const pagina = await contexto.newPage();
 
   await pagina.goto(`${BASE}/entrar`);
+  if (toca("entrada")) {
+    // El mapa de fondo carga teselas y recorre colonias despacio.
+    await pagina.waitForTimeout(6000);
+    await pagina.screenshot({ path: `${DESTINO}/entrada.jpg`, quality: 82 });
+    console.log(`  ${DESTINO}/entrada.jpg`);
+  }
   await pagina.fill("#password", PASSWORD);
   await pagina.click('button[type="submit"]');
   // Se espera al tablero y no a la URL: la navegacion es del lado del cliente
@@ -57,6 +71,7 @@ try {
   await pagina.waitForTimeout(1200);
 
   for (const [pestana, nombre] of PESTANAS) {
+    if (!toca(nombre.split(".")[0])) continue;
     await pagina.getByRole("tab", { name: pestana, exact: true }).click();
     // El mapa carga teselas y las gráficas animan al entrar: sin esta espera
     // la captura las agarra a medio dibujar.
@@ -68,6 +83,22 @@ try {
       ...(nombre.endsWith(".jpg") ? { quality: 82 } : {}),
     });
     console.log(`  ${DESTINO}/${nombre}`);
+  }
+
+  if (toca("asistente")) {
+    await pagina.getByRole("tab", { name: "Resumen", exact: true }).click();
+    await pagina.getByRole("button", { name: "Asistente" }).click();
+    await pagina
+      .getByLabel("Pregunta para el asistente")
+      .fill("¿Qué quedó pendiente? Dame los urgentes primero.");
+    await pagina.getByRole("button", { name: "Preguntar" }).click();
+    // Se espera a que deje de consultar, no un tiempo fijo: el modelo tarda lo
+    // que tarda, y una captura a medias mostraria el indicador de carga.
+    await pagina.getByText("Consultando el tablero").waitFor({ state: "visible", timeout: 10000 });
+    await pagina.getByText("Consultando el tablero").waitFor({ state: "detached", timeout: 90000 });
+    await pagina.waitForTimeout(800);
+    await pagina.screenshot({ path: `${DESTINO}/asistente.png` });
+    console.log(`  ${DESTINO}/asistente.png`);
   }
 } finally {
   await navegador.close();

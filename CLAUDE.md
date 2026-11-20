@@ -55,7 +55,7 @@ que existe:
 - Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
 - Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
 - Veinte migraciones, una por tabla, y seeders versionados aparte
-- 250 pruebas y 9 recorridos en verde, CI en verde
+- 275 pruebas y 9 recorridos en verde, CI en verde
 
 **La fase 6 se cerró el 15 de septiembre de 2026.** Un reporte real desde un
 teléfono recorrió todo —foto, ubicación, propuesta, confirmación, asignación,
@@ -490,7 +490,7 @@ se pudririan calladas y el fallo aparaceria el dia del despliegue, con prisa.
 Ese trabajo tambien comprueba que `pg_dump` este en la imagen y que el worker
 de MapLibre llegue a `public/`, que son las dos ausencias que no darian error.
 
-**Un solo origen detras de Caddy.** `/health`, `/auth`, `/board` y `/webhooks`
+**Un solo origen detras de Caddy.** `/health`, `/auth`, `/board`, `/public` y `/webhooks`
 van a la API y el resto al tablero. Con dos origenes habria que configurar CORS
 y la cookie de sesion viajaria entre sitios: dos fuentes de fallos que solo
 aparecen en produccion. Tambien decide `NEXT_PUBLIC_API_URL=""` en el build,
@@ -571,6 +571,40 @@ recibe asignado y en curso: dos filas, una persona. El panel decia «Se avisó a
 a quien reporto («asignado a Cuadrilla de bacheo»), y una letra no le dice a
 nadie quien va. Las de ejemplo quedan de baja y no se borran: los casos que se
 les asignaron las siguen nombrando.
+
+**El asistente del tablero solo mira, y por dos lados.** Sus herramientas son
+consultas escritas en codigo —el modelo elige cual y con que filtros, nunca
+escribe SQL— y corren en una transaccion `READ ONLY`: si alguien le agrega una
+herramienta que escribe, Postgres la rechaza. Una prueba ademas falla si
+`asistente.py` importa el despacho o hace escrituras. Es la regla de siempre
+—el modelo propone, el codigo decide— aplicada a preguntar.
+
+**El prompt del asistente define los terminos del sistema.** Sin eso el modelo
+los rellena: llamo «reportes» a los casos (inflando los numeros, que es lo que
+el sistema evita) e invento que «dudoso» era «sin ubicacion clara». Un termino
+nuevo en el tablero va tambien al prompt.
+
+**El panel del asistente solo enlaza casos.** El texto del modelo puede venir
+influido por lo que escribio quien reporto; un enlace arbitrario ahi seria una
+puerta. Solo se convierte en enlace lo que apunta a `/?caso=<uuid>`.
+
+**Tope diario de IA por persona**, chat y comparacion juntos: 10 el invitado
+—que es una cuenta compartida por todo el publico— y 40 cada operador. Medido:
+USD 0,006 por pregunta y 0,003 por comparacion, asi que el acceso publico no
+pasa de unos USD 0,07 al dia.
+
+**Comparar las fotos de un dudoso da una sugerencia, no una decision.**
+Parecidos, diferencias y «mismo problema / distintos / no se puede saber». Las
+acciones de juntar y separar siguen siendo de la persona.
+
+**La entrada no muestra datos del sistema.** Tuvo cifras en vivo y se quitaron:
+es una puerta que se cruza a diario, y lo que se publica sin sesion lo puede
+pedir cualquiera. `/public/config` dice una sola cosa —si el invitado
+despacha— para que el texto de la entrada no mienta.
+
+**Un enlace con `?caso=` abre en el caso**, no en el resumen. El caso va en la
+URL para poder compartirlo, y abrirlo en el resumen obligaba a buscarlo otra
+vez.
 
 ---
 
@@ -708,6 +742,13 @@ contra el segundo error, no contra el promedio de los dos.
   Queda en `corrected` aunque nadie corrigio nada; la exactitud no se ensucia
   porque `evaluation.py` excluye las filas sin propuesta. Distinguirlo pide un
   estado nuevo con su migracion.
+- **La cola no tiene paginacion: muestra 50.** Ordena por gravedad, por
+  cantidad de reportes y, en empate, por antiguedad, asi que un caso nuevo, leve
+  y de un solo reporte cae al final y con mas de 50 no se ve en «Todo» sin
+  filtrar. En produccion hoy no pasa; con volumen real hace falta paginar o
+  cargar mas al bajar.
+- **El tope diario de IA se reinicia en UTC**, o sea a las 6 de la tarde en El
+  Salvador, no a medianoche.
 - **Los mensajes del bot van sin tildes** («Mandame una foto… despues tu
   ubicacion»). Los del tablero ya las llevan; los de quien reporta, todavia no.
 - **`/status` todavia deja poner `assigned` o `in_progress` sin cuadrilla** y

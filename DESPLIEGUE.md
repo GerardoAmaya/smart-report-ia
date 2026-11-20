@@ -238,7 +238,7 @@ nunca se restauró es una suposición.
 
 ## Por qué está armado así
 
-**Un solo origen.** Caddy manda `/health`, `/auth`, `/board` y `/webhooks` a la
+**Un solo origen.** Caddy manda `/health`, `/auth`, `/board`, `/public` y `/webhooks` a la
 API y todo lo demás al tablero. Con dos orígenes habría que configurar CORS y
 la cookie de sesión viajaría entre sitios: dos fuentes de fallos que solo
 aparecen en producción.

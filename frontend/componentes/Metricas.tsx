@@ -21,7 +21,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { AlertTriangle, Layers, TrendingDown } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -94,15 +94,12 @@ export function Metricas() {
             <CardDescription>Últimos {data.dias} días</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Una sola serie: sin leyenda, el titulo la nombra. */}
+            {/* Una sola serie: sin leyenda, el titulo la nombra.
+                Barras por dia y no una curva: la curva suavizada dibujaba una
+                subida desde antes del primer reporte, en dias en que no entro
+                nada. Una barra por dia no inventa lo que no paso. */}
             <ChartContainer config={CONFIG_SERIE} className="h-[200px] w-full">
-              <AreaChart data={data.serie} margin={{ left: -20, right: 4, top: 4 }}>
-                <defs>
-                  <linearGradient id="relleno-reportes" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--serie-4)" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="var(--serie-4)" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={data.serie} margin={{ left: -20, right: 4, top: 4 }}>
                 {/* Rejilla recesiva: horizontal y nada mas. */}
                 <CartesianGrid vertical={false} strokeOpacity={0.35} />
                 <XAxis
@@ -120,7 +117,7 @@ export function Metricas() {
                 />
                 <YAxis tickLine={false} axisLine={false} width={44} allowDecimals={false} />
                 <ChartTooltip
-                  cursor={{ strokeOpacity: 0.4 }}
+                  cursor={{ fill: "var(--muted)", opacity: 0.6 }}
                   content={
                     <ChartTooltipContent
                       labelFormatter={(v) =>
@@ -133,14 +130,8 @@ export function Metricas() {
                     />
                   }
                 />
-                <Area
-                  dataKey="reportes"
-                  type="monotone"
-                  stroke="var(--serie-4)"
-                  strokeWidth={2}
-                  fill="url(#relleno-reportes)"
-                />
-              </AreaChart>
+                <Bar dataKey="reportes" fill="var(--serie-4)" radius={[3, 3, 0, 0]} maxBarSize={18} />
+              </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -218,6 +209,7 @@ function Hero({
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <motion.span
             key={reportes}
+            data-cifra="reportes"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}

@@ -75,8 +75,14 @@ export const CasoSchema = z.object({
   updated_at: z.string(),
   // Puede faltar: no todo punto tiene nombre, y el mapa lo sigue enseñando.
   address: z.string().nullable(),
+  // Miniatura firmada de la primera foto. Opcional ademas de nula: una API sin
+  // el campo no tiene por que romper la cola.
+  thumbnail_url: z.string().nullable().optional(),
 });
 export type Caso = z.infer<typeof CasoSchema>;
+
+/** Lo unico que se pide sin sesion: si el invitado puede despachar. */
+export const ConfigPublicaSchema = z.object({ demo_can_dispatch: z.boolean() });
 
 export const EvidenciaSchema = z.object({
   decision: z.enum(["grouped", "rejected", "doubtful", "alone"]),
@@ -186,6 +192,8 @@ export type Metricas = z.infer<typeof MetricasSchema>;
 
 export const api = {
   yo: () => pedir("/auth/yo", PerfilSchema),
+
+  configPublica: () => pedir("/public/config", ConfigPublicaSchema),
 
   entrarDePrueba: (password: string) =>
     pedir("/auth/demo", PerfilSchema, {

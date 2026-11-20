@@ -108,24 +108,26 @@ test("el ciclo completo: reportar, asignar, empezar, subir evidencia, cerrar y a
 test("el tablero se actualiza sin recargar", async ({ page, request }) => {
   /**
    * Lo que define esta fase. Se abre el tablero, entra un reporte por el bot, y
-   * la cola lo muestra **sin que nadie recargue**.
+   * el tablero lo cuenta **sin que nadie recargue**.
+   *
+   * Se mira el contador del resumen y no la cola: la cola ordena por gravedad y
+   * por antigüedad, muestra un tope, y un caso nuevo y leve cae al final. Con la
+   * base de desarrollo llena de corridas anteriores, el caso entraba y no se
+   * veia, y la prueba fallaba por un motivo que no era el que mide.
    */
   await entrarComoPrueba(page);
-  await page.getByRole("tab", { name: "Caso" }).click();
 
   // El indicador dice que el flujo esta vivo.
   await expect(page.getByText("En vivo")).toBeVisible({ timeout: 15_000 });
 
-  const antes = await page.getByRole("button", { name: /Calle o acera|Alumbrado|Basura|Agua/ }).count();
+  const contador = page.locator('[data-cifra="reportes"]');
+  await expect(contador).toBeVisible({ timeout: 15_000 });
+  const antes = Number(await contador.innerText());
 
-  const texto = `en-vivo-${Date.now()}`;
-  await reportarCompleto(request, { texto, metros: 5000 });
+  await reportarCompleto(request, { texto: `en-vivo-${Date.now()}`, metros: 5000 });
 
   // Sin page.reload(): si hiciera falta recargar, esto fallaria.
   await expect(async () => {
-    const ahora = await page
-      .getByRole("button", { name: /Calle o acera|Alumbrado|Basura|Agua/ })
-      .count();
-    expect(ahora).toBeGreaterThan(antes);
+    expect(Number(await contador.innerText())).toBeGreaterThan(antes);
   }).toPass({ timeout: 30_000 });
 });

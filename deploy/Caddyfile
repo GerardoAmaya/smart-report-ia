@@ -10,7 +10,7 @@
 	# Lo que atiende la API. El resto —incluido todo lo que Next sirve— va al
 	# tablero. Se enumeran las rutas de la API y no al reves: una ruta nueva
 	# del tablero no deberia exigir tocar el proxy.
-	@api path /health /auth/* /board/* /webhooks/*
+	@api path /health /auth/* /board/* /webhooks/* /public/*
 	reverse_proxy @api api:8000 {
 		# El tablero en vivo es un flujo que no termina: sin esto Caddy
 		# esperaria la respuesta completa y no entregaria nada.

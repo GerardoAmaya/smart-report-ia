@@ -30,6 +30,7 @@ import {
   Users,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -73,34 +74,56 @@ export function Despacho({ caso }: { caso: Detalle }) {
     cliente.invalidateQueries({ queryKey: ["metricas"] });
   };
 
-  function usar<T>(fn: () => Promise<T>) {
-    setError(null);
-    return fn().then(refrescar).catch((e: Error) => setError(e.message));
-  }
+  // Cada accion confirma lo que hizo, con lo que importa: a quien se le aviso.
+  // Antes el panel solo cambiaba de estado, y quien despacha no sabia si el
+  // aviso a quien reporto habia salido o no.
+  const avisando = (n: number, que: string) =>
+    n === 0
+      ? "No hay nadie más por avisar."
+      : `Avisando a ${n === 1 ? "1 persona" : `${n} personas`} ${que}.`;
 
   const asignar = useMutation({
     mutationFn: () => api.asignar(caso.id, cuadrilla),
-    onSuccess: refrescar,
+    onSuccess: (r) => {
+      refrescar();
+      toast.success(`Asignado a ${r.crew}`, {
+        description: avisando(r.avisados, "que ya tiene cuadrilla"),
+      });
+    },
     onError: (e: Error) => setError(e.message),
   });
   const empezar = useMutation({
     mutationFn: () => api.empezar(caso.id),
-    onSuccess: refrescar,
+    onSuccess: (r) => {
+      refrescar();
+      toast.success("En curso", { description: avisando(r.avisados, "que ya están trabajando") });
+    },
     onError: (e: Error) => setError(e.message),
   });
   const subir = useMutation({
     mutationFn: (f: File) => api.subirEvidencia(caso.id, f),
-    onSuccess: refrescar,
+    onSuccess: () => {
+      refrescar();
+      toast.success("Foto del arreglo subida", { description: "Ya se puede cerrar el caso." });
+    },
     onError: (e: Error) => setError(e.message),
   });
   const cerrar = useMutation({
     mutationFn: () => api.cerrar(caso.id, nota.trim() || undefined),
-    onSuccess: refrescar,
+    onSuccess: (r) => {
+      refrescar();
+      toast.success("Caso cerrado", {
+        description: avisando(r.avisados, "con la foto del arreglo"),
+      });
+    },
     onError: (e: Error) => setError(e.message),
   });
   const reabrir = useMutation({
     mutationFn: () => api.reabrir(caso.id),
-    onSuccess: refrescar,
+    onSuccess: () => {
+      refrescar();
+      toast("Caso reabierto", { description: "Vuelve a la cola de pendientes." });
+    },
     onError: (e: Error) => setError(e.message),
   });
 

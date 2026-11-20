@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Proveedores } from "@/lib/sesion";
 import { Tema } from "@/lib/tema";
@@ -24,6 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Tema>
           <Proveedores>
             <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+            {/* Confirma lo que hizo una accion de despacho. Abajo a la derecha:
+                lejos de la cola, que es donde estan los ojos. */}
+            <Toaster position="bottom-right" closeButton />
           </Proveedores>
         </Tema>
       </body>

@@ -85,6 +85,25 @@ def listar_casos(
         .scalar_subquery()
     )
 
+    # La miniatura de la primera foto guardada del caso, en la misma consulta:
+    # una por caso seria una consulta por fila de la cola. Firmar el enlace no
+    # toca la red, asi que se hace despues, en Python.
+    miniatura = (
+        select(ReportPhoto.thumbnail_key)
+        .join(Report, Report.id == ReportPhoto.report_id)
+        .where(
+            Report.case_id == Case.id,
+            ReportPhoto.kind == "report",
+            ReportPhoto.status == "stored",
+            ReportPhoto.deleted_at.is_(None),
+            ReportPhoto.thumbnail_key.is_not(None),
+        )
+        .order_by(ReportPhoto.created_at)
+        .limit(1)
+        .correlate(Case)
+        .scalar_subquery()
+    )
+
     filas = session.execute(
         select(
             Case,
@@ -93,6 +112,7 @@ def listar_casos(
             .filter(Report.grouping_status == "doubtful")
             .label("dudosos"),
             direccion.label("direccion"),
+            miniatura.label("miniatura"),
         )
         .outerjoin(Report, Report.case_id == Case.id)
         .where(*condiciones)
@@ -115,8 +135,9 @@ def listar_casos(
                 # Puede faltar: el sitio no siempre tiene nombre, y el punto
                 # sigue estando en el mapa.
                 "address": direccion,
+                "thumbnail_url": _url_de_foto(miniatura),
             }
-            for caso, reportes, dudosos, direccion in filas
+            for caso, reportes, dudosos, direccion, miniatura in filas
         ]
     }
 

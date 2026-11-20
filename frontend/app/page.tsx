@@ -10,22 +10,20 @@
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChartNoAxesCombined, List, LogOut, Map as MapIcon } from "lucide-react";
+import { ChartNoAxesCombined, List, Map as MapIcon } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
-import { CambiarTema } from "@/componentes/CambiarTema";
+import { BotonAsistente } from "@/componentes/Asistente";
+import { Buscador } from "@/componentes/Buscador";
 import { Cola } from "@/componentes/Cola";
 import { Detalle } from "@/componentes/Detalle";
 import { Fallo } from "@/componentes/Estados";
+import { MenuUsuario } from "@/componentes/MenuUsuario";
 import { EnVivo } from "@/componentes/EnVivo";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { useTiempoReal } from "@/lib/tiempo-real";
 import { Metricas } from "@/componentes/Metricas";
@@ -83,7 +81,9 @@ function Tablero() {
   // recargar no pierde donde estabas.
   const [seleccionado, setSeleccionado] = useState<string | null>(parametros.get("caso"));
   const [filtro, setFiltro] = useState("");
-  const [vista, setVista] = useState<Vista>("resumen");
+  // Con un caso en la URL se abre en el caso: un enlace compartido que llevaba
+  // al resumen obligaba a buscar el caso otra vez, que es lo que evitaba.
+  const [vista, setVista] = useState<Vista>(parametros.get("caso") ? "detalle" : "resumen");
   const enVivo = useTiempoReal();
 
   const elegir = (id: string) => {
@@ -93,7 +93,6 @@ function Tablero() {
     // historial del navegador de pasos atras que nadie quiere deshacer.
     window.history.replaceState(null, "", `?caso=${id}`);
   };
-  const cliente = useQueryClient();
 
   useEffect(() => {
     if (sinSesion) router.replace("/entrar");
@@ -114,9 +113,13 @@ function Tablero() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-2.5">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-2">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold tracking-tight">Smart Report</span>
+          <span className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/marca/avatar-bot.png" alt="" className="size-6 rounded-full" />
+            <span className="text-sm font-semibold tracking-tight">Smart Report</span>
+          </span>
           <Separator orientation="vertical" className="h-4" />
           <EnVivo estado={enVivo} />
         </div>
@@ -138,31 +141,10 @@ function Tablero() {
           </TabsList>
         </Tabs>
 
-        <div className="flex items-center gap-1">
-          <span className="hidden text-xs text-muted-foreground md:inline">
-            {perfil.display_name ?? perfil.email}
-            {perfil.role === "demo" && " · prueba"}
-          </span>
-          <CambiarTema />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Salir"
-                onClick={async () => {
-                  await api.salir();
-                  // Se limpia la cache: sin esto el perfil viejo sobrevive y
-                  // la pantalla de entrada rebota al tablero.
-                  cliente.clear();
-                  router.push("/entrar");
-                }}
-              >
-                <LogOut className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Salir</TooltipContent>
-          </Tooltip>
+        <div className="flex items-center gap-2">
+          <Buscador onElegir={elegir} onVista={setVista} />
+          <BotonAsistente alElegirCaso={elegir} />
+          <MenuUsuario perfil={perfil} />
         </div>
       </header>
 

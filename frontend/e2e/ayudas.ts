@@ -155,7 +155,9 @@ export async function entrarComoPrueba(page: Page): Promise<void> {
   await page.goto("/entrar");
   await page.getByLabel("Usuario de prueba").fill(password());
   await page.getByRole("button", { name: /entrar a mirar/i }).click();
-  await expect(page.getByRole("button", { name: "Salir" })).toBeVisible();
+  // Salir vive ahora dentro del menu de usuario: lo que prueba que se entro es
+  // que el menu este, no un boton suelto.
+  await expect(page.getByRole("button", { name: "Menú de usuario" })).toBeVisible();
 }
 
 /**

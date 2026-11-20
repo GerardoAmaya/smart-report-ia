@@ -13,7 +13,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { MapPin } from "lucide-react";
+import { ImageOff, MapPin } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, type Caso } from "@/lib/api";
@@ -139,26 +139,58 @@ function Item({
           transition={{ type: "spring", stiffness: 500, damping: 40 }}
         />
       )}
-      <div className="flex items-start justify-between gap-3">
-        <span className="truncate text-sm font-medium leading-tight">
-          {categoria(caso.category)}
-        </span>
-        <Cuantos n={caso.report_count} />
-      </div>
-      {/* Donde. Es lo primero que pregunta quien despacha y hasta ahora habia
-          que abrir el caso para saberlo. Se corta en una linea: son ocho horas
-          mirando esta lista y una direccion larga rompe el ritmo de la cola. */}
-      {caso.address && (
-        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <MapPin className="size-3 shrink-0" aria-hidden />
-          <span className="truncate">{caso.address}</span>
+      <div className="flex gap-3">
+        <Miniatura url={caso.thumbnail_url ?? null} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <span className="truncate text-sm font-medium leading-tight">
+              {categoria(caso.category)}
+            </span>
+            <Cuantos n={caso.report_count} />
+          </div>
+          {/* Donde. Es lo primero que pregunta quien despacha y hasta ahora habia
+              que abrir el caso para saberlo. Se corta en una linea: son ocho horas
+              mirando esta lista y una direccion larga rompe el ritmo de la cola. */}
+          {caso.address && (
+            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="size-3 shrink-0" aria-hidden />
+              {/* min-w-0: sin el, un hijo flexible no se encoge por debajo de su
+                  texto, y la direccion se cortaba en el borde sin puntos. */}
+              <span className="min-w-0 truncate">{caso.address}</span>
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <Severidad valor={caso.severity} />
+            <Dudoso cuantos={caso.doubtful_count} />
+            <span className="text-xs text-muted-foreground">{hace(caso.created_at)}</span>
+          </div>
         </div>
-      )}
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <Severidad valor={caso.severity} />
-        <Dudoso cuantos={caso.doubtful_count} />
-        <span className="text-xs text-muted-foreground">{hace(caso.created_at)}</span>
       </div>
     </motion.button>
+  );
+}
+
+/**
+ * La foto del caso, chica.
+ *
+ * Un bache y una luminaria se reconocen de un vistazo, antes de leer la
+ * categoria: es la forma mas rapida de recorrer la cola. Sin foto, el hueco
+ * queda igual: si la columna cambiara de ancho, la lista bailaria al cargar.
+ *
+ * `<img>` y no next/image: el enlace es prefirmado y de vida corta, y pasarlo
+ * por el optimizador lo cachearia mas alla de su caducidad.
+ */
+function Miniatura({ url }: { url: string | null }) {
+  return (
+    <div className="size-12 shrink-0 overflow-hidden rounded-md bg-muted">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" loading="lazy" className="size-full object-cover" />
+      ) : (
+        <div className="flex size-full items-center justify-center text-muted-foreground/60">
+          <ImageOff className="size-4" aria-hidden />
+        </div>
+      )}
+    </div>
   );
 }

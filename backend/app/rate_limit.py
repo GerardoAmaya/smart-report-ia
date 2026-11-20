@@ -30,7 +30,10 @@ _HIT = text(
     """
 )
 
-_SWEEP = text("DELETE FROM rate_limit_buckets WHERE window_start < :corte")
+# Cada ambito barre **solo lo suyo**. Sin el filtro, una peticion del webhook
+# (ventana de un minuto) borraba los contadores diarios del asistente, que
+# empiezan a medianoche, y el tope diario se reiniciaba al azar.
+_SWEEP = text("DELETE FROM rate_limit_buckets WHERE scope = :scope AND window_start < :corte")
 
 # Probabilidad de barrer ventanas viejas en una peticion dada. Barrer siempre
 # agrega un DELETE a cada request; no barrer nunca hace crecer la tabla sin
@@ -83,7 +86,9 @@ def hit(
     count = session.execute(_HIT, {"scope": scope, "key": key, "window_start": inicio}).scalar_one()
 
     if random.random() < _SWEEP_PROBABILITY:
-        session.execute(_SWEEP, {"corte": inicio - timedelta(seconds=window_seconds)})
+        session.execute(
+            _SWEEP, {"scope": scope, "corte": inicio - timedelta(seconds=window_seconds)}
+        )
 
     restante = int((inicio + timedelta(seconds=window_seconds) - now).total_seconds())
     return RateLimitResult(

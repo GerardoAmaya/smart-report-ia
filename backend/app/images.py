@@ -95,6 +95,23 @@ def para_aviso(data: bytes) -> bytes:
         return salida.getvalue()
 
 
+def para_comparar(data: bytes) -> bytes:
+    """Una foto de reporte, del tamaño que se le manda al modelo para comparar.
+
+    La imagen es la mayor parte del costo de cada llamada: se reduce al lado
+    mas largo de `compare_photo_size` y nunca se agranda.
+    """
+    with Image.open(io.BytesIO(data)) as img:
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+        lado = settings.compare_photo_size
+        img.thumbnail((lado, lado), Image.LANCZOS)
+
+        salida = io.BytesIO()
+        img.save(salida, format="JPEG", quality=85, optimize=True)
+        return salida.getvalue()
+
+
 def thumbnail(data: bytes) -> bytes:
     """Miniatura para la cola del tablero.
 

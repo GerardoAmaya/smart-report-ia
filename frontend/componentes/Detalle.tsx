@@ -31,6 +31,7 @@ import { api, type Reporte } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { categoria, hace, metros } from "@/lib/textos";
 import { puede, useSesion } from "@/lib/sesion";
+import { Comparar } from "./Comparar";
 import { Despacho } from "./Despacho";
 import { CargandoDetalle, Fallo, Vacio } from "./Estados";
 import { Estado, Severidad } from "./Marcas";
@@ -246,6 +247,10 @@ function Fila({
         )}
 
         <Senales decisiva={decisiva} />
+
+        {/* Solo para lo que quedó en duda: es donde una segunda mirada a las
+            dos fotos ayuda a decidir, y donde equivocarse esconde un problema. */}
+        {dudoso && <Comparar reporteId={reporte.id} />}
 
         {puedeSeparar && (
           <AlertDialog>

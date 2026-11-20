@@ -110,6 +110,22 @@ class Settings(BaseSettings):
     classify_image_variant: str = "thumbnail"
     classify_max_attempts: int = 3
 
+    # --- Asistente del tablero (chat y comparacion de dudosos) ---
+    # El mismo criterio que CLASSIFY_MODEL: el mas barato, elegido con el saldo
+    # a la vista. Subir de modelo es cambiar esta variable.
+    assistant_model: str = "claude-haiku-4-5"
+    # Tope diario por persona, chat y comparacion juntos. El invitado es publico
+    # y su contraseña esta en el README: sin tope, cualquiera gasta el saldo.
+    assistant_daily_limit: int = 40
+    assistant_daily_limit_demo: int = 10
+    # Vueltas de herramientas por pregunta. Sin limite, una pregunta mal hecha
+    # puede encadenar consultas y llamadas al modelo sin fin.
+    assistant_max_tool_rounds: int = 6
+    assistant_timeout_seconds: float = 60.0
+    # Lado mas largo de cada foto al compararlas. Dos fotos a 768 se ven bien
+    # para distinguir un bache de otro y cuestan menos que los originales.
+    compare_photo_size: int = 768
+
     # Avisos de vuelta. Mas intentos que en lo demas: que a alguien no le
     # llegue el aviso de que su reporte se resolvio es justo lo que hace que
     # no vuelva a reportar.

@@ -80,12 +80,13 @@ El código que mide las tres existe y **avisa cuando la muestra no alcanza** en
 vez de dar un número. Las etiquetas de la fase 3 se juntan solas: cada
 confirmación en el bot es una.
 
-**Fase 8 escrita, sin desplegar todavia.** Existen las imagenes de produccion,
-el compose del servidor con Caddy, el respaldo diario a R2, la retencion como
-servicio, el guion de registro del webhook y `DESPLIEGUE.md`. Falta lo que solo
-se puede hacer con las cuentas creadas: levantarlo y correr su verificacion —un
-reporte real de punta a punta sobre el sistema desplegado, y el costo por
-reporte medido.
+**Fase 8 desplegada el 20 de noviembre de 2026**, sin cerrar todavia. Corre en
+`https://smart-report-sv.duckdns.org` —Oracle Always Free en Querétaro, ARM
+2 OCPU / 12 GB— con el bot de produccion `@smartreport_sv_bot`. Comprobado al
+desplegar: certificado, `/health` en verde, migraciones, siembra, webhook
+registrado, primer respaldo en R2, y la base cerrada a internet. Falta su
+verificacion: un reporte real de punta a punta sobre lo desplegado, y el costo
+por reporte medido con el.
 
 ## Decisiones tomadas
 
@@ -453,11 +454,10 @@ que la revision viene en camino.
 un guion bajo suelto hace que Telegram rechace el mensaje entero con 400. Los
 asteriscos se quitaron; la negrita no vale el mensaje perdido.
 
-**Por ahora corre en local; el material de despliegue queda escrito.** Se
-decidio no desplegar todavia, no por falta de material sino porque el camino
-gratuito pide una tarde de cuentas y firewall. Lo escrito no se borra: cuando
-haya tiempo se levanta. Si en algun momento se prefiere pagar por simplicidad,
-lo mas simple hoy es **Railway** —5 USD al mes con 5 de consumo incluido, y
+**Gratis quiere decir permanente, no una prueba.** Render, Railway, Supabase y
+Neon se descartaron por eso: base que caduca a los 30 dias, cuenta de prueba, o
+proyecto que se pausa sin trafico. Si en algun momento se prefiere pagar por
+simplicidad, lo mas simple hoy es **Railway** —5 USD al mes con 5 de consumo incluido, y
 cobra por uso, asi que con cuatro servicios chicos la cuenta real ronda los 5 a
 10—; tiene plantilla de un clic con `postgis/postgis:17-3.5`, las mismas
 versiones de aqui. Ojo con cual: la variante con pgbouncer **rompe el tablero en
@@ -510,6 +510,39 @@ usuario de prueba público. Google dice quién es, no si puede entrar: la
 autorización es una tabla de correos permitidos con su rol. La contraseña del
 usuario de prueba va en variable de entorno, nunca en el código, y ese usuario
 no puede borrar.
+
+**En produccion el usuario de prueba solo mira.** Su contraseña esta en el
+README, y el tablero ya no es una muestra: con permiso de despacho, cualquiera
+podria cerrar un caso real y el bot le avisaria al ciudadano que se arreglo sin
+que nadie fuera. `DEMO_CAN_DISPATCH` lo enciende en local y en las E2E, que
+recorren el ciclo con el; por defecto va apagado. El tablero no ofrece botones
+que la API va a rechazar: los permisos le llegan de `/auth/yo`.
+
+**Si el modelo falla, la persona elige la categoria.** Sin saldo, con el tope de
+gasto alcanzado o con Anthropic caido, la clasificacion queda en `failed` y el
+bot manda los mismos botones de corregir. Antes el reporte quedaba atascado sin
+avisar: el bot ya habia dicho «la revision viene en camino». Con eso, quedarse
+sin saldo degrada el sistema en vez de pararlo.
+
+**El bot de produccion no es el de desarrollo.** Un bot admite un solo webhook,
+y `make tunnel` lo apunta a la Mac y lo borra al salir: produccion se quedaria
+sorda sin ningun error. El bot anterior, `@smart_report_sv_bot`, se perdio por
+un token filtrado en una prueba del repositorio publico; ver la prueba
+`test_sin_secretos.py` y el paso de CI que revisa todo lo versionado.
+
+**El trabajador y el mantenimiento esperan a que la API este sana**, no solo a
+la base. La API migra antes de responder, asi que «sana» quiere decir «esquema
+al dia». En el primer despliegue la retencion corrio contra tablas que no
+existian y el respaldo salio con el esquema a medias.
+
+**Un `.env` no se carga con `.` desde `sh`.** Es para compose, no para shell:
+`GEOCODE_USER_AGENT` lleva parentesis sin comillas y el `.` revienta, y sin `./`
+delante ni siquiera encuentra el archivo. Los guiones leen las variables que
+necesitan con `sed`. Paso en `registrar-webhook.sh` y en `e2e.sh`.
+
+**La foto del bot la dibuja un guion**, `scripts/avatar-bot.py`, con la paleta
+de PLAN.md: una via con su linea pintada y un pin color cono. Por lo mismo que
+las capturas: lo que no se puede rehacer envejece.
 
 ---
 
@@ -636,6 +669,19 @@ contra el segundo error, no contra el promedio de los dos.
 - **`EXTRACTION_MODEL` se quitó de `.env.example`** al reescribirlo en la
   fase 1. No lo leía nadie. Cuando la fase 3 elija modelo, vuelve con su
   lector, no antes.
+- **Oracle puede recuperar la maquina si la ve ociosa**: 7 dias con CPU, red y
+  memoria bajo el 20 %, y este sistema entra en el criterio. Pasar la cuenta a
+  Pay As You Go probablemente lo evita, sin garantia escrita. Si pasa, se
+  rehace con `deploy/preparar-servidor.sh` y el ultimo respaldo.
+- **Los filtros corporativos bloquean DuckDNS** por categoria (*Dynamic DNS*):
+  desde una red asi el tablero no abre. Para quien despache detras de uno, hace
+  falta un dominio propio.
+- **Un reporte sin propuesta del modelo sale como «corregido» en el tablero.**
+  Queda en `corrected` aunque nadie corrigio nada; la exactitud no se ensucia
+  porque `evaluation.py` excluye las filas sin propuesta. Distinguirlo pide un
+  estado nuevo con su migracion.
+- **Los mensajes del bot van sin tildes** («Mandame una foto… despues tu
+  ubicacion»). Los del tablero ya las llevan; los de quien reporta, todavia no.
 
 ## Lo que todavía no se sabe
 

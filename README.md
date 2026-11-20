@@ -1,8 +1,52 @@
-# Smart Report IA
+<p align="center">
+  <img src="docs/marca/avatar-bot.png" alt="Smart Report: un pin de ubicación sobre una vía" width="120">
+</p>
 
-Sistema de reportes ciudadanos de hallazgos en la vía pública de El Salvador.
+<h1 align="center">Smart Report IA</h1>
+
+<p align="center">
+  Reportes ciudadanos de problemas en la vía pública de El Salvador.<br>
+  Una foto por Telegram, agrupada con las de quienes vieron lo mismo, y un aviso de vuelta cuando se arregla.
+</p>
+
+<p align="center">
+  <a href="https://t.me/smartreport_sv_bot"><b>Probar el bot</b></a> ·
+  <a href="https://smart-report-sv.duckdns.org"><b>Abrir el tablero</b></a> ·
+  <a href="#cómo-funciona-por-dentro">Cómo funciona</a> ·
+  <a href="DESPLIEGUE.md">Desplegar</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://smart-report-sv.duckdns.org/health"><img alt="En producción" src="https://img.shields.io/badge/producción-en%20línea-1f6f5c"></a>
+  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-233%20%2B%209%20E2E-1f6f5c">
+  <img alt="Costo de infraestructura" src="https://img.shields.io/badge/infraestructura-USD%200%2Fmes-c77b23">
+</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white">
+  <img alt="PostGIS" src="https://img.shields.io/badge/PostGIS-3.5-5CAE58">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white">
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white">
+  <img alt="MapLibre" src="https://img.shields.io/badge/MapLibre-6-396CB2?logo=maplibre&logoColor=white">
+  <br>
+  <img alt="Claude" src="https://img.shields.io/badge/Claude-Haiku%204.5-D97757?logo=anthropic&logoColor=white">
+  <img alt="Telegram" src="https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?logo=telegram&logoColor=white">
+  <img alt="Cloudflare R2" src="https://img.shields.io/badge/Cloudflare-R2-F38020?logo=cloudflare&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
+  <img alt="Caddy" src="https://img.shields.io/badge/Caddy-2-1F88C0?logo=caddy&logoColor=white">
+  <img alt="Oracle Cloud" src="https://img.shields.io/badge/Oracle%20Cloud-Always%20Free-F80000?logo=oracle&logoColor=white">
+  <img alt="Playwright" src="https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white">
+</p>
+
+---
+
 Alguien ve un hueco en la calle, le manda una foto a un bot de Telegram, y la
-cuadrilla lo ve agrupado con los otros tres que reportaron lo mismo.
+cuadrilla lo ve **agrupado con los otros tres que reportaron lo mismo**.
 
 Hay dos personas con necesidades opuestas. **Quien reporta** está parado frente
 al problema, con prisa, y tiene que poder reportar en menos de un minuto sin
@@ -10,9 +54,25 @@ instalar nada. **Quien despacha** mira el sistema ocho horas, y su problema no
 es recibir reportes sino saber cuáles son el mismo. El sistema existe para la
 segunda; la primera es el sensor.
 
-El alcance, las fases y las decisiones ya tomadas están en [`PLAN.md`](PLAN.md).
+## Pruébalo
 
----
+Está en producción. Las dos mitades se pueden tocar:
+
+| | |
+|---|---|
+| 📱 **El bot** | [**@smartreport_sv_bot**](https://t.me/smartreport_sv_bot): *Iniciar*, una foto, tu ubicación |
+| 🗺️ **El tablero** | [**smart-report-sv.duckdns.org**](https://smart-report-sv.duckdns.org) |
+| 🔑 **Usuario de prueba** | En *Usuario de prueba*, contraseña **`demo-Are2G6f1pOvg`** |
+| 🩺 **Estado** | [`/health`](https://smart-report-sv.duckdns.org/health): base, esquema, modelo y almacenamiento |
+
+El usuario de prueba **solo mira**: cola, casos, mapa, métricas y la evidencia
+de cada agrupación. Despachar está reservado a operadores, porque los casos son
+reales y cerrar uno le avisa a quien lo reportó que ya se arregló.
+
+> Lo que mandes al bot aparece en el tablero. Si mandas una foto que no es de la
+> vía pública, el modelo la va a proponer como *no es un reporte*, que es lo
+> correcto. Y si tu red de trabajo filtra los dominios de DNS dinámico, abre el
+> tablero desde el celular.
 
 ## Qué hace
 
@@ -28,6 +88,10 @@ no se puede sostener se informa.** El modelo clasifica y sugiere; no asigna
 cuadrillas ni cierra casos. La agrupación la decide código con umbrales
 medidos, muestra su evidencia y se puede deshacer. Lo que queda en el límite se
 marca como dudoso, con el motivo, esperando a una persona.
+
+El riesgo que esto evita: **agrupar mal en silencio.** Si el sistema junta dos
+huecos distintos en un caso, la cuadrilla arregla uno y cierra los dos, y el
+problema real queda escondido detrás de un ticket resuelto.
 
 ## Cómo se ve
 
@@ -46,12 +110,13 @@ reportaron y no solo al primero. Cada mensaje dice cuál de sus reportes es
 
 ### Para quien despacha
 
-El tablero, con datos reales del mismo reporte.
+El tablero en vivo: la cola de casos, las métricas y la entrada de reportes en
+el tiempo. Se actualiza solo, sin recargar.
 
 ![La cola de casos, métricas y la entrada de reportes en el tiempo](docs/capturas/tablero-resumen.png)
 
 Un caso abierto: la foto de quien reportó, la dirección resuelta, y el panel de
-despacho —que no deja cerrar sin foto del arreglo, porque un cierre sin
+despacho, que no deja cerrar sin foto del arreglo porque un cierre sin
 evidencia es una afirmación que nadie puede comprobar.
 
 ![Detalle de un caso con su foto, dirección y el panel de despacho](docs/capturas/tablero-caso.png)
@@ -61,103 +126,111 @@ puntos iguales tira a la basura justo la información que importa.
 
 ![Mapa de casos sobre San Salvador](docs/capturas/tablero-mapa.jpg)
 
-> Las del tablero se regeneran con `cd frontend && DEMO_PASSWORD=… node
-> scripts/capturas.mjs`, contra lo que haya en la base. No inventan datos.
+> Las capturas del tablero las saca un guion contra lo que haya en la base, no
+> una mano: `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`.
+
+## Cómo funciona por dentro
+
+```mermaid
+flowchart LR
+    C(["Quien reporta<br/>Telegram"]) -->|"foto + ubicación"| TG["API de Telegram"]
+    TG -->|"webhook HTTPS"| CADDY
+    O(["Quien despacha<br/>navegador"]) -->|"HTTPS"| CADDY
+
+    subgraph VM["Oracle Cloud · ARM 2 OCPU · 12 GB · Docker Compose"]
+        CADDY["Caddy<br/>TLS y proxy"] --> API["API<br/>FastAPI"]
+        CADDY --> WEB["Tablero<br/>Next.js"]
+        API <--> DB[("PostgreSQL 17 + PostGIS<br/>datos · colas · LISTEN/NOTIFY")]
+        W["Trabajador<br/>4 colas"] <--> DB
+        M["Mantenimiento<br/>retención y respaldo"] --> DB
+    end
+
+    W --> R2[("Cloudflare R2<br/>fotos y respaldos")]
+    M --> R2
+    W --> AI["Claude Haiku 4.5<br/>propuesta de categoría"]
+    W --> NOM["Nominatim<br/>dirección escrita"]
+    W -->|"avisos de vuelta"| TG
+```
+
+Cinco decisiones que definen la forma del sistema:
+
+- **El webhook no hace ni una llamada de red saliente.** La respuesta a quien
+  reporta viaja en el cuerpo de la propia respuesta HTTP. La foto, el modelo y
+  la dirección van a colas, fuera del camino que Telegram cronometra.
+- **La cola vive en Postgres**, con `SELECT … FOR UPDATE SKIP LOCKED`, y el
+  tablero se entera de los cambios por `LISTEN/NOTIFY` y SSE. Sin Redis y sin
+  bus de mensajes: un segundo almacén es infraestructura que hay que desplegar,
+  vigilar y explicar.
+- **Se agrupa por la categoría que confirmó una persona**, nunca por la que
+  propuso el modelo, y por distancia medida con PostGIS. La huella perceptual
+  de la foto se anota como evidencia pero **no fuerza** una unión: una imagen
+  idéntica a 60 m puede ser un reenvío.
+- **Tres salidas y no dos:** agrupado, dudoso o solo. La banda de duda existe
+  porque la asimetría manda: separar dos reportes del mismo caso es molesto;
+  juntar dos problemas distintos esconde uno.
+- **Si el modelo falla, el sistema sigue.** Sin saldo o sin servicio, el bot le
+  pide la categoría a la persona con botones, y el reporte entra igual.
+
+El razonamiento completo, y lo que cada decisión costó descubrir, está en
+[`docs/DISENO.md`](docs/DISENO.md).
+
+## Con qué está hecho
+
+| Capa | Tecnología | Por qué esta |
+|---|---|---|
+| **API** | FastAPI · SQLAlchemy 2 · Alembic · Python 3.13 | tipos de punta a punta y migraciones versionadas |
+| **Base** | PostgreSQL 17 + PostGIS 3.5 | distancia geográfica real, y además cola y bus de eventos |
+| **Modelo** | Claude Haiku 4.5, con salida por esquema | no puede inventar una categoría: o cae en el enum o la llamada falla |
+| **Canal** | Telegram Bot API, detrás de una interfaz `InboundChannel` | sin instalar nada; WhatsApp sería otro adaptador, no un rediseño |
+| **Fotos** | Cloudflare R2 (S3), MinIO en local | el tablero sirve las mismas fotos ocho horas al día, y R2 no cobra salida |
+| **Tablero** | Next.js 16 · React 19 · TypeScript 6 · Tailwind 4 · shadcn/ui | |
+| **Mapa** | MapLibre 6 con teselas de OpenFreeMap | gratis, sin clave y sin límite de cargas |
+| **Datos en vivo** | TanStack Query + SSE | el tablero escucha y no habla: no hace falta WebSocket |
+| **Servidor** | Docker Compose · Caddy 2 · Oracle Cloud Always Free (ARM) | un solo origen con HTTPS automático, sin CORS |
+| **Pruebas** | pytest · Playwright · GitHub Actions | las E2E corren contra el sistema levantado, con un Telegram falso |
 
 ## Estado
 
 | Fase | | |
 |---|---|---|
-| 0 · Esqueleto | cerrada | |
-| 1 · El canal | cerrada | webhook, límites, cero llamadas salientes |
-| 2 · Almacenamiento | cerrada | miniaturas, huella perceptual, retención |
-| 3 · Clasificación | **abierta** | falta la muestra de 200 fotos etiquetadas |
-| 4 · Agrupación | **abierta** | faltan 200 reportes agrupados a mano |
-| 5 · El tablero | **abierta** | falta que alguien que no lo vio lo entienda solo |
-| 6 · Despacho y cierre | cerrada | ciclo real completo, de la foto al aviso de cerrado |
-| 7 · Tiempo real y E2E | cerrada | SSE sobre `LISTEN/NOTIFY`, 9 recorridos en CI |
-| 8 · Despliegue | escrita | corre en local; falta ponerla en un servidor |
+| 0 · Esqueleto | ✅ cerrada | |
+| 1 · El canal | ✅ cerrada | webhook, límites, cero llamadas salientes |
+| 2 · Almacenamiento | ✅ cerrada | miniaturas, huella perceptual, retención |
+| 3 · Clasificación | 🟡 abierta | falta la muestra de 200 fotos etiquetadas |
+| 4 · Agrupación | 🟡 abierta | faltan 200 reportes agrupados a mano |
+| 5 · El tablero | 🟡 abierta | falta que alguien que no lo vio lo entienda solo |
+| 6 · Despacho y cierre | ✅ cerrada | ciclo real completo, de la foto al aviso de cerrado |
+| 7 · Tiempo real y E2E | ✅ cerrada | SSE sobre `LISTEN/NOTIFY`, 9 recorridos en CI |
+| 8 · Despliegue | 🚀 desplegada | en producción; falta medir el costo por reporte real |
 
 Las fases abiertas lo están porque **sus verificaciones piden datos que todavía
 no existen**, no porque falte código: el que las mide está escrito y avisa
 cuando la muestra no alcanza en vez de dar un número. Una fase sin verificación
 es una fase que alguien cree que terminó.
 
----
+## Lo que cuesta
 
-## Con qué está hecho
+Todo corre en una máquina, y todo lo que la rodea está en un nivel gratuito
+**permanente**, no en una prueba que vence al mes:
 
-| | |
-|---|---|
-| **Backend** | FastAPI · SQLAlchemy 2 · Alembic · Python 3.13 |
-| **Base** | PostgreSQL 17 con PostGIS 3.5 — también hace de cola y de bus de eventos |
-| **Modelo** | Anthropic `claude-haiku-4-5`, con salida por esquema |
-| **Canal** | python-telegram-bot, usado como **biblioteca y no como framework** |
-| **Almacenamiento** | S3-compatible: MinIO en local, R2 al desplegar |
-| **Tablero** | Next.js 16 · shadcn/ui · MapLibre · TanStack Query |
-| **Pruebas** | pytest y Playwright contra el sistema levantado |
+| Pieza | Servicio | Costo |
+|---|---|---|
+| Servidor (2 núcleos ARM, 12 GB) | Oracle Cloud Always Free | USD 0 |
+| Fotos y respaldos (10 GB, sin costo de salida) | Cloudflare R2 | USD 0 |
+| Dominio | DuckDNS | USD 0 |
+| HTTPS | Let's Encrypt, renovado por Caddy | USD 0 |
+| Mapa y direcciones | OpenFreeMap y Nominatim | USD 0 |
+| Integración continua | GitHub Actions | USD 0 |
+| **Clasificar una foto** | Claude Haiku 4.5, con miniatura | **USD 0,0018** |
 
-Sin Redis y sin bus de mensajes: la cola es una tabla con `FOR UPDATE SKIP
-LOCKED` y los avisos al tablero salen de `LISTEN/NOTIFY`. Un segundo almacén es
-infraestructura que hay que desplegar, vigilar y explicar; cuando el volumen lo
-justifique, se cambia el adaptador.
-
-## Arrancar
-
-```bash
-cp .env.example .env      # poner ANTHROPIC_API_KEY
-make up
-make seed
-```
-
-| | |
-|---|---|
-| API | http://localhost:8000/health |
-| Docs | http://localhost:8000/docs |
-| Web | http://localhost:3100 |
-| MinIO | http://localhost:9001 |
-| Postgres | `localhost:5433` (no 5432) |
-
-`make up` levanta Postgres con PostGIS, MinIO, corre las migraciones y sirve
-API y frontend. La primera vez tarda: construye las imágenes. `make seed`
-deja sembrados los canales conocidos y se puede correr las veces que sea.
-
-## Comandos
-
-| | |
-|---|---|
-| `make test` | pytest contra la base levantada |
-| `make lint` | ruff, ESLint y `tsc --noEmit` |
-| `make e2e` | los nueve recorridos contra el sistema levantado |
-| `make tunnel` | túnel HTTPS y registro del webhook en Telegram |
-| `make health` | `/health` formateado |
-| `make nuke` | baja todo y borra los datos |
-
-Hay más —migraciones, siembra, retención, y los que **miden**: `make bench`
-para el costo por foto, `make accuracy` para la exactitud, `make grouping-eval`
-para las dos tasas de agrupación—. `make help` los lista todos.
-
-## Cómo funciona por dentro
-
-El diseño, y lo que cada decisión costó descubrir, está en
-[`docs/DISENO.md`](docs/DISENO.md): el webhook sin llamadas de red salientes, la
-cola que vive en Postgres, por qué la huella de una foto **no** fuerza una
-agrupación, y la asimetría que calibra los umbrales —separar dos reportes que
-eran el mismo caso es molesto; juntar dos problemas distintos esconde uno.
-
-## Desplegar
-
-Hoy corre en local. El material para ponerlo en un servidor está escrito y
-probado —imágenes de producción, compose con Caddy, respaldo diario y retención
-como servicio— en [`DESPLIEGUE.md`](DESPLIEGUE.md).
-
-Todo el software del despliegue es gratuito y permanente. El **único costo real
-del sistema es el modelo**: USD 0,0018 por foto.
+El modelo es el único costo real, y por uso: mil fotos son menos de dos
+dólares. La foto es dos tercios de cada llamada, así que se le manda la
+miniatura y no el original. Cómo se levanta todo, paso a paso y con lo que
+hace perder una tarde si no se sabe, está en [`DESPLIEGUE.md`](DESPLIEGUE.md).
 
 ## Métricas
 
-Las cuatro que definen si el proyecto sirve. Se llenan con el número medido,
-nunca con una promesa.
+Se llenan con el número medido, nunca con una promesa.
 
 | Qué | Valor | Fase |
 |---|---|---|
@@ -168,7 +241,42 @@ nunca con una promesa.
 | Costo de almacenamiento por foto | **USD 0,0000201** (n=1) | 2 |
 | Costo por reporte | — | 8 |
 
-## Convenciones
+## Arrancar en local
 
-Identificadores, cadenas y mensajes de commit en inglés. Comentarios y
-docstrings en español. Commits en formato Conventional Commits.
+```bash
+cp .env.example .env      # poner ANTHROPIC_API_KEY y el token de un bot de desarrollo
+make up
+make seed
+```
+
+| | |
+|---|---|
+| Tablero | http://localhost:3100 |
+| API | http://localhost:8000/health · [docs](http://localhost:8000/docs) |
+| MinIO | http://localhost:9001 |
+| Postgres | `localhost:5433` |
+
+Usa un bot **distinto** del de producción: un bot admite un solo webhook, y
+`make tunnel` lo apunta a tu máquina.
+
+| Comando | |
+|---|---|
+| `make test` | pytest contra la base levantada |
+| `make lint` | ruff, ESLint y `tsc --noEmit` |
+| `make e2e` | los nueve recorridos contra el sistema levantado |
+| `make tunnel` | túnel HTTPS y registro del webhook en Telegram |
+| `make bench` · `make accuracy` · `make grouping-eval` | los que **miden**: costo, exactitud y las dos tasas de agrupación |
+
+`make help` lista el resto.
+
+## Documentación
+
+| | |
+|---|---|
+| [`PLAN.md`](PLAN.md) | alcance, fases y la verificación de cada una |
+| [`docs/DISENO.md`](docs/DISENO.md) | cómo funciona por dentro y por qué |
+| [`DESPLIEGUE.md`](DESPLIEGUE.md) | ponerlo en internet gratis, y operarlo |
+| [`CLAUDE.md`](CLAUDE.md) | las decisiones tomadas, con su motivo |
+
+Identificadores, cadenas y commits en inglés; comentarios y documentación en
+español. Commits en formato Conventional Commits.

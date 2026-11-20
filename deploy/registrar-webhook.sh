@@ -14,8 +14,14 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-# shellcheck disable=SC1090
-. "$ENV_FILE"
+# Se leen las tres variables y no se carga el archivo con `.`: el .env es para
+# compose, no para sh. Cargarlo fallaba dos veces en el primer despliegue —sin
+# `./` delante, `.` busca en el PATH y no lo encuentra, y aun encontrandolo
+# revienta en GEOCODE_USER_AGENT, que lleva parentesis sin comillas—.
+leer() { sed -n "s/^$1=//p" "$ENV_FILE" | tail -n 1; }
+TELEGRAM_BOT_TOKEN="$(leer TELEGRAM_BOT_TOKEN)"
+TELEGRAM_WEBHOOK_SECRET="$(leer TELEGRAM_WEBHOOK_SECRET)"
+DOMINIO="$(leer DOMINIO)"
 
 if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_WEBHOOK_SECRET" ] || [ -z "$DOMINIO" ]; then
   echo "Faltan TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET o DOMINIO en $ENV_FILE" >&2

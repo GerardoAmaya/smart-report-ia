@@ -39,6 +39,18 @@ services:
       ENVIRONMENT: production
     depends_on:
       db: {condition: service_healthy}
+    # Sana = ya responde. start.sh migra **antes** de levantar uvicorn, asi que
+    # responder significa que el esquema esta al dia. De esto cuelgan worker y
+    # mantenimiento: sin esperarlo, en el primer despliegue la retencion corrio
+    # contra tablas que no existian y el respaldo salio con el esquema a medias.
+    # Python y no curl: la imagen slim no trae curl. /health da 200 aunque este
+    # degradado, que es lo que se quiere: aqui solo importa que ya arranco.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
 
   worker:
     build:
@@ -52,6 +64,8 @@ services:
       ENVIRONMENT: production
     depends_on:
       db: {condition: service_healthy}
+      # Espera a las migraciones, no solo a la base: ver el healthcheck de api.
+      api: {condition: service_healthy}
 
   mantenimiento:
     # Retencion y respaldo. Van **dentro** del despliegue y no en un cron del
@@ -69,6 +83,8 @@ services:
       ENVIRONMENT: production
     depends_on:
       db: {condition: service_healthy}
+      # Espera a las migraciones, no solo a la base: ver el healthcheck de api.
+      api: {condition: service_healthy}
 
   web:
     build:

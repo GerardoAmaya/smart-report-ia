@@ -37,7 +37,7 @@ Este principio no se negocia: es lo que hace el sistema verificable.
 
 ## Estado
 
-**Fases 0, 1, 2, 6 y 7 cerradas y verificadas. Fases 3, 4 y 5 escritas.** Lo
+**Fases 0, 1, 2, 6, 7 y 8 cerradas y verificadas. Fases 3, 4 y 5 escritas.** Lo
 que existe:
 
 - `InboundChannel` como contrato, con Telegram como primera implementación
@@ -55,7 +55,7 @@ que existe:
 - Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
 - Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
 - Veinte migraciones, una por tabla, y seeders versionados aparte
-- 198 pruebas y 9 recorridos en verde, CI en verde
+- 250 pruebas y 9 recorridos en verde, CI en verde
 
 **La fase 6 se cerró el 15 de septiembre de 2026.** Un reporte real desde un
 teléfono recorrió todo —foto, ubicación, propuesta, confirmación, asignación,
@@ -80,13 +80,15 @@ El código que mide las tres existe y **avisa cuando la muestra no alcanza** en
 vez de dar un número. Las etiquetas de la fase 3 se juntan solas: cada
 confirmación en el bot es una.
 
-**Fase 8 desplegada el 20 de noviembre de 2026**, sin cerrar todavia. Corre en
+**La fase 8 se cerró el 20 de noviembre de 2026.** Corre en
 `https://smart-report-sv.duckdns.org` —Oracle Always Free en Querétaro, ARM
-2 OCPU / 12 GB— con el bot de produccion `@smartreport_sv_bot`. Comprobado al
-desplegar: certificado, `/health` en verde, migraciones, siembra, webhook
-registrado, primer respaldo en R2, y la base cerrada a internet. Falta su
-verificacion: un reporte real de punta a punta sobre lo desplegado, y el costo
-por reporte medido con el.
+2 OCPU / 12 GB— con el bot de produccion `@smartreport_sv_bot`. Un reporte real
+desde un telefono recorrio todo sobre lo desplegado, comprobado en los datos:
+propuesta `vialidad/alta` en 1,9 s y confirmada, direccion resuelta («Colonia
+Manuel José Arce, San Salvador»), caso asignado, en curso y `closed` con una
+foto de arreglo, y tres avisos en `sent` al primer intento. Costo por reporte
+medido con el: **USD 0,0015** (n=1), y el 98 % es el modelo; el resto, a precio
+de lista de R2, cae dentro del nivel gratuito.
 
 ## Decisiones tomadas
 
@@ -544,6 +546,32 @@ necesitan con `sed`. Paso en `registrar-webhook.sh` y en `e2e.sh`.
 de PLAN.md: una via con su linea pintada y un pin color cono. Por lo mismo que
 las capturas: lo que no se puede rehacer envejece.
 
+**La foto del arreglo y el cierre, solo con el caso en curso.** Antes se podia
+ir de abierto a cerrado subiendo una foto, sin asignar a nadie, y quien
+reporto recibia «resuelto» sin haber sabido nunca que alguien iba. Ahora el
+orden es asignado → en curso → resuelto, y lo exige la API, no solo el
+tablero. `/status?nuevo=closed` era una puerta lateral —cerraba sin foto, sin
+`closed_at` y sin avisar— y se cerro.
+
+**El aviso de cierre lleva la foto del arreglo.** Quien reporto es quien mejor
+sabe si de verdad se arreglo, y la foto es lo que le deja comprobarlo: el mismo
+principio de «un cierre sin evidencia no se puede comprobar», extendido a quien
+reporto. Va la ultima, reducida a 1280 px —el original pesa hasta 20 MB, y
+mandarlo es gastarle datos moviles ajenos—, con el texto de siempre de pie. La
+foto acompaña al aviso y nunca es la razon de que no llegue: si no se puede
+preparar o Telegram la rechaza, sale como texto; un corte de red se reintenta
+**con** foto. Lo que se acepta: una vez enviada queda en el chat de quien
+reporto, y la retencion de la evidencia ya no la alcanza ahi.
+
+**El contador de avisos cuenta personas, no mensajes.** Quien reporto una vez
+recibe asignado y en curso: dos filas, una persona. El panel decia «Se avisó a
+2 personas». Cada persona cuenta una vez, en su peor estado.
+
+**Las cuadrillas van por especialidad**, una por categoria. Su nombre le llega
+a quien reporto («asignado a Cuadrilla de bacheo»), y una letra no le dice a
+nadie quien va. Las de ejemplo quedan de baja y no se borran: los casos que se
+les asignaron las siguen nombrando.
+
 ---
 
 ## Convenciones
@@ -623,7 +651,7 @@ Van al README con el número medido, nunca con una promesa.
 | Exactitud de clasificación | — | 3 |
 | Agrupaciones incorrectas (falsos positivos) | — | 4 |
 | Agrupaciones perdidas (falsos negativos) | — | 4 |
-| Costo por reporte | — | 8 |
+| Costo por reporte | USD 0,0015 (n=1) | 8 |
 
 **La métrica de agrupación tiene una asimetría que hay que respetar.** Separar
 dos reportes que eran el mismo caso genera trabajo duplicado, que es molesto.
@@ -682,6 +710,13 @@ contra el segundo error, no contra el promedio de los dos.
   estado nuevo con su migracion.
 - **Los mensajes del bot van sin tildes** («Mandame una foto… despues tu
   ubicacion»). Los del tablero ya las llevan; los de quien reporta, todavia no.
+- **`/status` todavia deja poner `assigned` o `in_progress` sin cuadrilla** y
+  sin avisar. El tablero no lo usa —solo las pruebas—, pero es la misma clase
+  de puerta lateral que tenia `closed`.
+- **Una falla de pytest sin identificar.** El 20 de noviembre una corrida dio
+  1 fallo entre 250 y no se alcanzo a ver cual; trece corridas seguidas despues
+  salieron limpias. Si vuelve, correr con `-rf` para tener el nombre antes de
+  repetir.
 
 ## Lo que todavía no se sabe
 

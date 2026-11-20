@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://smart-report-sv.duckdns.org/health"><img alt="En producción" src="https://img.shields.io/badge/producción-en%20línea-1f6f5c"></a>
-  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-233%20%2B%209%20E2E-1f6f5c">
+  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-250%20%2B%209%20E2E-1f6f5c">
   <img alt="Costo de infraestructura" src="https://img.shields.io/badge/infraestructura-USD%200%2Fmes-c77b23">
 </p>
 
@@ -201,7 +201,7 @@ El razonamiento completo, y lo que cada decisión costó descubrir, está en
 | 5 · El tablero | 🟡 abierta | falta que alguien que no lo vio lo entienda solo |
 | 6 · Despacho y cierre | ✅ cerrada | ciclo real completo, de la foto al aviso de cerrado |
 | 7 · Tiempo real y E2E | ✅ cerrada | SSE sobre `LISTEN/NOTIFY`, 9 recorridos en CI |
-| 8 · Despliegue | 🚀 desplegada | en producción; falta medir el costo por reporte real |
+| 8 · Despliegue | ✅ cerrada | un reporte real de punta a punta en producción, con su costo medido |
 
 Las fases abiertas lo están porque **sus verificaciones piden datos que todavía
 no existen**, no porque falte código: el que las mide está escrito y avisa
@@ -239,7 +239,7 @@ Se llenan con el número medido, nunca con una promesa.
 | Agrupaciones incorrectas (falsos positivos) | — | 4 |
 | Agrupaciones perdidas (falsos negativos) | — | 4 |
 | Costo de almacenamiento por foto | **USD 0,0000201** (n=1) | 2 |
-| Costo por reporte | — | 8 |
+| Costo por reporte | **USD 0,0015** (n=1, el 98 % es el modelo) | 8 |
 
 ## Arrancar en local
 

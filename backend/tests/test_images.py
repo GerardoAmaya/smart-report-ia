@@ -111,3 +111,17 @@ def test_las_sinteticas_no_son_todas_iguales():
     """Semillas distintas dan fotos distintas, no la misma con otro nombre."""
     muestras = {foto_sintetica(semilla=s) for s in range(5)}
     assert len(muestras) == 5
+
+
+def test_la_foto_del_aviso_se_reduce_al_lado_mas_largo():
+    grande = foto_sintetica(ancho=3000, alto=2000, objetivo_bytes=None)
+    with Image.open(io.BytesIO(images.para_aviso(grande))) as img:
+        assert img.format == "JPEG"
+        assert img.size == (settings.notify_photo_width, 853)
+
+
+def test_la_foto_del_aviso_no_se_agranda():
+    """Una foto chica estirada no prueba mejor el arreglo."""
+    chica = foto_sintetica(ancho=400, alto=300, objetivo_bytes=None)
+    with Image.open(io.BytesIO(images.para_aviso(chica))) as img:
+        assert img.size == (400, 300)

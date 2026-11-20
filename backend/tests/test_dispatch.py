@@ -7,10 +7,12 @@ ahorrar trabajo, porque permite responderle a cuatro personas con un solo
 arreglo.
 """
 
+import io
 import uuid
 from datetime import UTC, datetime
 
 import pytest
+from PIL import Image
 from pydantic import SecretStr
 from sqlalchemy import func, select
 
@@ -75,6 +77,12 @@ def caso_con_reportes(session, usuarios: list[str], categoria: str = "vialidad")
     return caso
 
 
+def en_curso(sesion, caso_id, cuadrilla) -> None:
+    """Asignar y empezar: lo que ahora hace falta antes de la foto del arreglo."""
+    assert sesion.post(f"/board/cases/{caso_id}/assign?crew_id={cuadrilla.id}").status_code == 200
+    assert sesion.post(f"/board/cases/{caso_id}/start").status_code == 200
+
+
 def subir_evidencia(sesion, caso_id) -> None:
     datos = foto_sintetica(semilla=91)
     r = sesion.post(
@@ -95,7 +103,7 @@ def test_se_avisa_a_todos_los_que_reportaron(sesion, session, cuadrilla):
     """
     caso = caso_con_reportes(session, ["101", "102", "103", "104"])
 
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
     r = sesion.post(f"/board/cases/{caso.id}/close?nota=Se+bacheo+el+tramo")
 
@@ -118,7 +126,7 @@ def test_quien_reporto_tres_veces_recibe_un_aviso(sesion, session, cuadrilla):
     """Quien mas reporta no puede acabar mas molestado por el sistema."""
     caso = caso_con_reportes(session, ["201", "201", "201", "202"])
 
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
     sesion.post(f"/board/cases/{caso.id}/close")
 
@@ -135,11 +143,12 @@ def test_quien_reporto_tres_veces_recibe_un_aviso(sesion, session, cuadrilla):
 def test_cerrar_dos_veces_no_reenvia_el_aviso(sesion, session, cuadrilla):
     """Un sistema que avisa dos veces de lo mismo se aprende a ignorar."""
     caso = caso_con_reportes(session, ["301"])
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
     sesion.post(f"/board/cases/{caso.id}/close")
 
     sesion.post(f"/board/cases/{caso.id}/reopen")
+    sesion.post(f"/board/cases/{caso.id}/start")
     r = sesion.post(f"/board/cases/{caso.id}/close")
 
     assert r.json()["avisados"] == 0
@@ -245,7 +254,7 @@ def test_no_se_cierra_sin_foto_del_arreglo(sesion, session, cuadrilla):
     """Cerrar sin evidencia convierte el cierre en una afirmacion que nadie
     puede comprobar."""
     caso = caso_con_reportes(session, ["401"])
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
 
     r = sesion.post(f"/board/cases/{caso.id}/close")
 
@@ -261,9 +270,10 @@ def test_no_se_cierra_sin_foto_del_arreglo(sesion, session, cuadrilla):
     assert cierres == 0
 
 
-def test_la_evidencia_se_valida_abriendola(sesion, session):
+def test_la_evidencia_se_valida_abriendola(sesion, session, cuadrilla):
     """Un archivo con cabecera JPEG y basura detras revienta despues."""
     caso = caso_con_reportes(session, ["501"])
+    en_curso(sesion, caso.id, cuadrilla)
     falso = b"\\xff\\xd8\\xff\\xe0" + b"basura" * 200
 
     r = sesion.post(
@@ -275,9 +285,10 @@ def test_la_evidencia_se_valida_abriendola(sesion, session):
     assert session.execute(select(func.count(CasePhoto.id))).scalar_one() == 0
 
 
-def test_la_evidencia_guarda_quien_la_subio(sesion, session):
+def test_la_evidencia_guarda_quien_la_subio(sesion, session, cuadrilla):
     """Una evidencia sin autor no se puede cuestionar."""
     caso = caso_con_reportes(session, ["601"])
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
 
     foto = session.execute(select(CasePhoto)).scalar_one()
@@ -286,7 +297,7 @@ def test_la_evidencia_guarda_quien_la_subio(sesion, session):
     assert foto.content_sha256
 
 
-def test_la_evidencia_no_entra_en_la_agrupacion(sesion, session):
+def test_la_evidencia_no_entra_en_la_agrupacion(sesion, session, cuadrilla):
     """Va en tabla propia justo para que no pueda.
 
     Compartiendo tabla con las de reporte, olvidar un `WHERE kind='report'` una
@@ -295,6 +306,7 @@ def test_la_evidencia_no_entra_en_la_agrupacion(sesion, session):
     from app.models import ReportPhoto
 
     caso = caso_con_reportes(session, ["701"])
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
 
     assert session.execute(select(func.count(CasePhoto.id))).scalar_one() == 1
@@ -342,7 +354,7 @@ def test_reabrir_limpia_la_fecha_de_cierre(sesion, session, cuadrilla):
     anterior.
     """
     caso = caso_con_reportes(session, ["1101"])
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
     sesion.post(f"/board/cases/{caso.id}/close")
     session.refresh(caso)
@@ -367,12 +379,16 @@ def test_el_trabajador_manda_el_aviso(sesion, session, cuadrilla, monkeypatch):
     monkeypatch.setattr(TelegramChannel, "notify", falso)
 
     caso = caso_con_reportes(session, ["1201", "1202"])
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
     sesion.post(f"/board/cases/{caso.id}/close?nota=Listo")
 
-    # Dos de asignacion y dos de cierre.
-    assert notify_worker.run_once(session) == 4
+    # Dos de asignacion, dos de "en curso" y dos de cierre. En varias pasadas:
+    # el trabajador toma tandas de `worker_batch_size`, que son menos que seis.
+    total = 0
+    while (n := notify_worker.run_once(session)) > 0:
+        total += n
+    assert total == 6
 
     assert {u for u, _ in enviados} == {"1201", "1202"}
     assert any("resuelto" in t for _, t in enviados)
@@ -431,10 +447,276 @@ def test_el_cierre_no_depende_de_que_el_aviso_salga(sesion, session, cuadrilla, 
     monkeypatch.setattr(TelegramChannel, "notify", siempre_falla)
 
     caso = caso_con_reportes(session, ["1501"])
-    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+    en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
     r = sesion.post(f"/board/cases/{caso.id}/close")
 
     assert r.status_code == 200
     session.refresh(caso)
     assert caso.status == "closed"
+
+
+# --- El aviso de cierre lleva la foto del arreglo ---
+#
+# Quien reporto es quien mejor sabe si de verdad se arreglo: la foto es lo que
+# le deja comprobarlo. Y la foto acompaña al aviso; nunca es la razon de que no
+# llegue.
+
+
+def _cerrar_con_foto(sesion, session, cuadrilla, usuario: str) -> Case:
+    caso = caso_con_reportes(session, [usuario])
+    en_curso(sesion, caso.id, cuadrilla)
+    subir_evidencia(sesion, caso.id)
+    assert sesion.post(f"/board/cases/{caso.id}/close?nota=Listo").status_code == 200
+    return caso
+
+
+def _vaciar_cola(session) -> None:
+    while notify_worker.run_once(session) > 0:
+        pass
+
+
+def _aviso_de_cierre(session) -> Notification:
+    aviso = session.execute(select(Notification).where(Notification.kind == "closed")).scalar_one()
+    session.refresh(aviso)
+    return aviso
+
+
+def test_el_aviso_de_cierre_lleva_la_foto_del_arreglo(sesion, session, cuadrilla, monkeypatch):
+    textos: list[str] = []
+    fotos: list[tuple[bytes, str]] = []
+
+    async def texto(self, external_user_id, text):
+        textos.append(text)
+
+    async def con_foto(self, external_user_id, photo, caption):
+        fotos.append((photo, caption))
+
+    monkeypatch.setattr(TelegramChannel, "notify", texto)
+    monkeypatch.setattr(TelegramChannel, "notify_photo", con_foto)
+
+    _cerrar_con_foto(sesion, session, cuadrilla, "1601")
+    _vaciar_cola(session)
+
+    # Asignado y en curso van como texto; el cierre, con su foto. Se compara
+    # con el texto exacto: «resuelto» lo dice tambien el de asignacion.
+    cierre = _aviso_de_cierre(session).body
+    assert len(textos) == 2
+    assert cierre not in textos
+    assert len(fotos) == 1
+    foto, pie = fotos[0]
+    assert pie == cierre
+    with Image.open(io.BytesIO(foto)) as img:
+        assert img.format == "JPEG"
+        assert max(img.size) <= settings.notify_photo_width
+
+
+def test_si_telegram_rechaza_la_foto_el_aviso_sale_como_texto(
+    sesion, session, cuadrilla, monkeypatch
+):
+    textos: list[str] = []
+
+    async def texto(self, external_user_id, text):
+        textos.append(text)
+
+    async def rechaza(self, external_user_id, photo, caption):
+        raise RuntimeError("Bad Request: PHOTO_INVALID_DIMENSIONS")
+
+    monkeypatch.setattr(TelegramChannel, "notify", texto)
+    monkeypatch.setattr(TelegramChannel, "notify_photo", rechaza)
+
+    _cerrar_con_foto(sesion, session, cuadrilla, "1602")
+    _vaciar_cola(session)
+
+    aviso = _aviso_de_cierre(session)
+    assert aviso.body in textos
+    assert aviso.status == "sent"
+
+
+def test_un_corte_de_red_con_foto_se_reintenta_con_foto(sesion, session, cuadrilla, monkeypatch):
+    """Caer al texto por un corte de red perderia la foto sin motivo."""
+    textos: list[str] = []
+
+    async def texto(self, external_user_id, text):
+        textos.append(text)
+
+    async def se_cae(self, external_user_id, photo, caption):
+        raise ConnectionError("la red")
+
+    monkeypatch.setattr(TelegramChannel, "notify", texto)
+    monkeypatch.setattr(TelegramChannel, "notify_photo", se_cae)
+
+    _cerrar_con_foto(sesion, session, cuadrilla, "1603")
+    _vaciar_cola(session)
+
+    aviso = _aviso_de_cierre(session)
+    assert aviso.status == "pending"
+    assert aviso.next_attempt_at is not None
+    assert aviso.body not in textos
+
+
+def test_a_quien_bloqueo_el_bot_tampoco_se_le_reintenta_la_foto(
+    sesion, session, cuadrilla, monkeypatch
+):
+    async def texto(self, external_user_id, text):
+        pass
+
+    async def bloqueado(self, external_user_id, photo, caption):
+        raise RuntimeError("Forbidden: bot was blocked by the user")
+
+    monkeypatch.setattr(TelegramChannel, "notify", texto)
+    monkeypatch.setattr(TelegramChannel, "notify_photo", bloqueado)
+
+    _cerrar_con_foto(sesion, session, cuadrilla, "1604")
+    _vaciar_cola(session)
+
+    aviso = _aviso_de_cierre(session)
+    assert aviso.status == "failed"
+    assert aviso.attempts == 1
+
+
+# --- La foto del arreglo y el cierre, solo en curso ---
+#
+# Antes se podia ir de abierto a cerrado subiendo una foto, sin asignar a nadie:
+# quien reporto recibia «resuelto» sin haber sabido nunca que alguien iba.
+
+
+def _cuantas_evidencias(session) -> int:
+    return session.execute(select(func.count(CasePhoto.id))).scalar_one()
+
+
+def test_no_se_sube_la_foto_con_el_caso_abierto(sesion, session):
+    caso = caso_con_reportes(session, ["1601"])
+
+    r = sesion.post(
+        f"/board/cases/{caso.id}/evidence",
+        files={"archivo": ("arreglo.jpg", foto_sintetica(semilla=92), "image/jpeg")},
+    )
+
+    assert r.status_code == 409
+    assert "trabajando" in r.json()["detail"]
+    assert _cuantas_evidencias(session) == 0
+
+
+def test_no_se_sube_la_foto_con_el_caso_solo_asignado(sesion, session, cuadrilla):
+    caso = caso_con_reportes(session, ["1701"])
+    sesion.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
+
+    r = sesion.post(
+        f"/board/cases/{caso.id}/evidence",
+        files={"archivo": ("arreglo.jpg", foto_sintetica(semilla=93), "image/jpeg")},
+    )
+
+    assert r.status_code == 409
+    assert "trabajando" in r.json()["detail"]
+    assert _cuantas_evidencias(session) == 0
+
+
+def test_no_se_cierra_asignado_aunque_haya_foto(sesion, session, cuadrilla):
+    """La foto no basta: el caso tiene que estar en curso al cerrar."""
+    caso = caso_con_reportes(session, ["1801"])
+    en_curso(sesion, caso.id, cuadrilla)
+    subir_evidencia(sesion, caso.id)
+    # Vuelve a asignado con la foto ya puesta.
+    assert sesion.post(f"/board/cases/{caso.id}/status?nuevo=assigned").status_code == 200
+
+    r = sesion.post(f"/board/cases/{caso.id}/close")
+
+    assert r.status_code == 409
+    assert "trabajando" in r.json()["detail"]
+    session.refresh(caso)
+    assert caso.status == "assigned"
+    cierres = session.execute(
+        select(func.count(Notification.id)).where(Notification.kind == "closed")
+    ).scalar_one()
+    assert cierres == 0
+
+
+def test_no_se_cierra_por_el_cambio_de_estado(sesion, session):
+    """La puerta lateral: cerraba sin foto, sin `closed_at` y sin avisar."""
+    caso = caso_con_reportes(session, ["1901"])
+
+    r = sesion.post(f"/board/cases/{caso.id}/status?nuevo=closed")
+
+    assert r.status_code == 409
+    session.refresh(caso)
+    assert caso.status == "open"
+    assert caso.closed_at is None
+
+
+def test_el_camino_completo_avisa_en_orden(sesion, session, cuadrilla):
+    """Abierto, asignado, en curso, foto, cerrado: los tres avisos, en orden."""
+    caso = caso_con_reportes(session, ["2001"])
+
+    en_curso(sesion, caso.id, cuadrilla)
+    subir_evidencia(sesion, caso.id)
+    r = sesion.post(f"/board/cases/{caso.id}/close?nota=Listo")
+
+    assert r.status_code == 200
+    session.refresh(caso)
+    assert caso.status == "closed"
+    assert caso.closed_at is not None
+    tipos = (
+        session.execute(
+            select(Notification.kind)
+            .where(Notification.external_user_id == "2001")
+            .order_by(Notification.created_at)
+        )
+        .scalars()
+        .all()
+    )
+    assert tipos == ["assigned", "in_progress", "closed"]
+
+
+# --- El contador del panel cuenta personas, no mensajes ---
+#
+# Con un solo reporte de una sola persona, tras asignar y marcar en curso, el
+# panel decia «se aviso a 2 personas»: eran sus dos avisos.
+
+
+def _marcar_avisos(session, caso_id, estado: str = "sent") -> None:
+    for n in session.execute(select(Notification).where(Notification.case_id == caso_id)).scalars():
+        n.status = estado
+    session.commit()
+
+
+def _contador(sesion, caso_id) -> dict:
+    r = sesion.get(f"/board/cases/{caso_id}")
+    assert r.status_code == 200, r.text
+    return r.json()["notifications"]
+
+
+def test_una_persona_con_dos_avisos_cuenta_una_vez(sesion, session, cuadrilla):
+    caso = caso_con_reportes(session, ["2101"])
+    en_curso(sesion, caso.id, cuadrilla)
+    _marcar_avisos(session, caso.id)
+
+    assert _contador(sesion, caso.id) == {"sent": 1, "pending": 0, "failed": 0}
+
+
+def test_dos_personas_son_dos(sesion, session, cuadrilla):
+    caso = caso_con_reportes(session, ["2201", "2202"])
+    en_curso(sesion, caso.id, cuadrilla)
+    _marcar_avisos(session, caso.id)
+
+    assert _contador(sesion, caso.id) == {"sent": 2, "pending": 0, "failed": 0}
+
+
+def test_cada_persona_cae_en_su_peor_estado(sesion, session, cuadrilla):
+    """Los tres numeros suman exactamente las personas."""
+    caso = caso_con_reportes(session, ["2301", "2302"])
+    en_curso(sesion, caso.id, cuadrilla)
+    _marcar_avisos(session, caso.id)
+    uno = (
+        session.execute(
+            select(Notification).where(
+                Notification.case_id == caso.id, Notification.external_user_id == "2302"
+            )
+        )
+        .scalars()
+        .first()
+    )
+    uno.status = "failed"
+    session.commit()
+
+    assert _contador(sesion, caso.id) == {"sent": 1, "pending": 0, "failed": 1}

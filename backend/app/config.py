@@ -91,6 +91,13 @@ class Settings(BaseSettings):
     thumbnail_width: int = 320
     thumbnail_quality: int = 80
 
+    # La foto del arreglo que se manda con el aviso de cierre. Reducida y no el
+    # original: este pesa hasta 20 MB, Telegram acepta 10 en fotos, y mandarlo
+    # entero a cada vecino es gastarle datos moviles ajenos. 1280 se ve bien en
+    # cualquier telefono.
+    notify_photo_width: int = 1280
+    notify_photo_quality: int = 85
+
     # --- Clasificacion ---
     # El mas barato de los tres, elegido con el saldo a la vista. La foto es
     # dos tercios del costo, asi que la miniatura ahorra mas que cambiar de

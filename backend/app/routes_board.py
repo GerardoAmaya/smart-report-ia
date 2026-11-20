@@ -286,15 +286,25 @@ def detalle_del_caso(
         .all()
     )
 
-    # Cuantos avisos salieron y a cuantos les llego. Se enseña porque es la
-    # parte que casi nadie construye: si no se ve, nadie sabe que existe.
-    avisos = dict(
-        session.execute(
-            select(Notification.status, func.count(Notification.id))
-            .where(Notification.case_id == case_id)
-            .group_by(Notification.status)
-        ).all()
-    )
+    # A cuantas **personas** se les aviso. Se enseña porque es la parte que casi
+    # nadie construye: si no se ve, nadie sabe que existe.
+    #
+    # Por persona y no por fila: cada una recibe hasta tres avisos (asignado,
+    # en curso, cerrado), y contar filas decia «se aviso a 2 personas» con un
+    # solo reporte de una sola persona. Cada persona cae en un solo grupo, el
+    # mas preocupante: si un aviso no le llego, «sin entregar»; si le falta
+    # alguno, «por avisar»; solo con todos enviados, «avisada». Asi los tres
+    # numeros suman exactamente las personas.
+    avisos = {"sent": 0, "pending": 0, "failed": 0}
+    for fallo, pendiente in session.execute(
+        select(
+            func.bool_or(Notification.status == "failed"),
+            func.bool_or(Notification.status.in_(("pending", "processing"))),
+        )
+        .where(Notification.case_id == case_id)
+        .group_by(Notification.channel, Notification.external_user_id)
+    ).all():
+        avisos["failed" if fallo else "pending" if pendiente else "sent"] += 1
 
     return {
         "id": str(caso.id),
@@ -317,11 +327,8 @@ def detalle_del_caso(
             }
             for f in evidencias
         ],
-        "notifications": {
-            "sent": avisos.get("sent", 0),
-            "pending": avisos.get("pending", 0) + avisos.get("processing", 0),
-            "failed": avisos.get("failed", 0),
-        },
+        # Personas, no mensajes; ver arriba.
+        "notifications": avisos,
         "reports": salida,
     }
 
@@ -359,6 +366,15 @@ def cambiar_estado(
     caso = session.get(Case, case_id)
     if caso is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no existe ese caso")
+
+    # Cerrar por aqui era una puerta lateral: sin foto, sin `closed_at` —de la
+    # que cuelga la retencion— y sin avisar a nadie. Cerrar tiene su accion,
+    # que exige el caso en curso y la foto del arreglo.
+    if nuevo == "closed":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Para cerrar hace falta la foto del arreglo: usa la acción de cerrar.",
+        )
 
     caso.status = nuevo
     session.commit()
@@ -536,6 +552,12 @@ async def subir_evidencia(
     y basura detras pasa cualquier numero magico y revienta despues.
     """
     caso = _caso_o_404(session, case_id)
+    # Antes de leer el archivo: rechazar despues de subir 20 MB es hacerle
+    # esperar a quien despacha para decirle algo que ya se sabia.
+    try:
+        dispatch.exigir_en_curso(caso)
+    except dispatch.NoSePuede as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
     datos = await archivo.read()
     if len(datos) > settings.max_photo_bytes:

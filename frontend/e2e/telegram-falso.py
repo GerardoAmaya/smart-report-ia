@@ -45,6 +45,27 @@ def _foto(semilla: int = 0) -> bytes:
 FOTO = _foto()
 
 
+def _formulario(tipo: str, cuerpo: bytes) -> dict[str, bytes]:
+    """Los campos de un multipart/form-data, por nombre.
+
+    Con el parser de correo de la biblioteca estandar: `cgi` ya no existe en
+    Python 3.13, y escribir un parser de multipart a mano es como se cuelan
+    los fallos que despues no reproduce nadie.
+    """
+    from email.parser import BytesParser
+    from email.policy import default
+
+    mensaje = BytesParser(policy=default).parsebytes(
+        f"Content-Type: {tipo}\r\n\r\n".encode() + cuerpo
+    )
+    campos: dict[str, bytes] = {}
+    for parte in mensaje.iter_parts():
+        nombre = parte.get_param("name", header="content-disposition")
+        if nombre:
+            campos[nombre] = parte.get_payload(decode=True) or b""
+    return campos
+
+
 def _interpretar(crudo: str) -> dict:
     """Saca de la peticion a quien va, que dice y que botones lleva.
 
@@ -131,6 +152,29 @@ class Manejador(BaseHTTPRequestHandler):
             ENVIADOS.append(_interpretar(crudo))
             return self._json(
                 {"message_id": len(ENVIADOS), "date": 0, "chat": {"id": 1, "type": "private"}}
+            )
+
+        # El aviso de cierre va con la foto del arreglo. Llega como formulario con
+        # archivo y no como JSON, asi que se lee aparte; se guarda el tamaño de
+        # la foto, que es lo que deja a una prueba comprobar que fue con ella.
+        if metodo == "sendPhoto":
+            largo = int(self.headers.get("Content-Length") or 0)
+            campos = _formulario(self.headers.get("Content-Type", ""), self.rfile.read(largo))
+            ENVIADOS.append(
+                {
+                    "chat_id": campos.get("chat_id", b"").decode(),
+                    "texto": campos.get("caption", b"").decode(),
+                    "botones": [],
+                    "foto": len(campos.get("photo", b"")),
+                }
+            )
+            return self._json(
+                {
+                    "message_id": len(ENVIADOS),
+                    "date": 0,
+                    "chat": {"id": 1, "type": "private"},
+                    "photo": [{"file_id": "f", "file_unique_id": "u", "width": 1, "height": 1}],
+                }
             )
 
         if metodo == "_enviados":

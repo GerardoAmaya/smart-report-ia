@@ -17,15 +17,62 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app import images, storage
 from app.channels import get_channel
 from app.config import settings
-from app.models import Notification
+from app.models import CasePhoto, Notification
 
 log = logging.getLogger("smart_report.notify")
+
+# Tope de Telegram para el pie de una foto. Un aviso mas largo va sin foto: es
+# preferible el texto entero que la foto con el texto cortado.
+LIMITE_PIE = 1024
 
 
 class FalloPermanente(Exception):
     """No mejora reintentando."""
+
+
+def _es_de_la_persona(exc: Exception) -> bool:
+    """Quien bloqueo al bot o borro la conversacion no va a recibirlo nunca."""
+    texto = str(exc).lower()
+    return "blocked" in texto or "chat not found" in texto or "deactivated" in texto
+
+
+def _es_de_red(exc: Exception) -> bool:
+    """Un corte que se arregla solo: se reintenta, con la foto incluida."""
+    return isinstance(exc, (OSError, TimeoutError)) or type(exc).__name__ in {
+        "NetworkError",
+        "TimedOut",
+    }
+
+
+def _foto_del_arreglo(session: Session, aviso: Notification) -> bytes | None:
+    """La ultima foto del arreglo, reducida, si el aviso es el de cierre.
+
+    **El cierre va con su prueba.** Quien reporto es quien mejor sabe si de
+    verdad se arreglo, y la foto es lo que le deja comprobarlo. Va solo a
+    quienes reportaron ese caso, y una vez enviada queda en su chat: la
+    retencion de la evidencia ya no la alcanza ahi.
+
+    Cualquier fallo al prepararla devuelve None y el aviso sale como texto: la
+    foto acompaña al aviso y no puede ser la razon de que no llegue.
+    """
+    if aviso.kind != "closed" or len(aviso.body) > LIMITE_PIE:
+        return None
+    foto = session.execute(
+        select(CasePhoto)
+        .where(CasePhoto.case_id == aviso.case_id, CasePhoto.deleted_at.is_(None))
+        .order_by(CasePhoto.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if foto is None:
+        return None
+    try:
+        return images.para_aviso(storage.get(foto.storage_key))
+    except Exception:
+        log.warning("aviso %s sale sin foto: no se pudo preparar", aviso.id, exc_info=True)
+        return None
 
 
 def reclaim_stale(session: Session) -> int:
@@ -61,15 +108,30 @@ def claim(session: Session, limite: int) -> list[Notification]:
     return filas
 
 
-def process_one(aviso: Notification) -> None:
+def _enviar(session: Session, aviso: Notification) -> None:
     canal = get_channel(aviso.channel)
+    foto = _foto_del_arreglo(session, aviso)
+    if foto is not None:
+        try:
+            asyncio.run(canal.notify_photo(aviso.external_user_id, foto, aviso.body))
+            return
+        except Exception as exc:
+            # De la persona o de la red: lo decide quien llama, igual que sin
+            # foto. Cualquier otra cosa es Telegram rechazando la imagen, y
+            # entonces el aviso sale como texto en vez de no salir.
+            if _es_de_la_persona(exc) or _es_de_red(exc):
+                raise
+            log.warning("aviso %s sin foto, Telegram la rechazo: %s", aviso.id, exc)
+    asyncio.run(canal.notify(aviso.external_user_id, aviso.body))
+
+
+def process_one(session: Session, aviso: Notification) -> None:
     try:
-        asyncio.run(canal.notify(aviso.external_user_id, aviso.body))
+        _enviar(session, aviso)
     except Exception as exc:
-        # Quien bloqueo al bot o borro la conversacion no va a recibirlo nunca:
-        # reintentar eso es gastar cuota para llegar a la misma conclusion.
-        texto = str(exc).lower()
-        if "blocked" in texto or "chat not found" in texto or "deactivated" in texto:
+        # Reintentar a quien bloqueo al bot es gastar cuota para llegar a la
+        # misma conclusion.
+        if _es_de_la_persona(exc):
             raise FalloPermanente(
                 f"{type(exc).__name__}: no se puede escribir a esta persona"
             ) from exc
@@ -110,7 +172,7 @@ def run_once(session: Session) -> int:
 
     for aviso in filas:
         try:
-            process_one(aviso)
+            process_one(session, aviso)
             session.commit()
             log.info("aviso %s enviado a %s", aviso.kind, aviso.external_user_id)
         except FalloPermanente as exc:

@@ -12,6 +12,11 @@
  * afirmacion que nadie puede comprobar, y el tablero existe para que las
  * afirmaciones se puedan comprobar. Por eso el boton de cerrar no aparece hasta
  * que hay foto, y se dice por que.
+ *
+ * **Y la foto solo se sube con el caso en curso.** Antes se podia subir con el
+ * caso recien abierto y cerrarlo sin asignar a nadie: quien reporto recibia
+ * «resuelto» sin haber sabido que alguien iba. La API lo rechaza; aqui solo se
+ * deja de ofrecer.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
@@ -100,6 +105,7 @@ export function Despacho({ caso }: { caso: Detalle }) {
   });
 
   const cerrado = caso.status === "closed";
+  const enCurso = caso.status === "in_progress";
   const tieneEvidencia = caso.evidence.length > 0;
 
   return (
@@ -153,8 +159,15 @@ export function Despacho({ caso }: { caso: Detalle }) {
           </Button>
         )}
 
-        {/* --- Evidencia --- */}
-        {!cerrado && (
+        {/* --- Evidencia: solo en curso --- */}
+        {!cerrado && !enCurso && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Camera className="size-3.5" />
+            La foto del arreglo se sube cuando la cuadrilla ya está trabajando.
+          </p>
+        )}
+
+        {enCurso && (
           <div>
             <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
               <Camera className="size-3.5" />
@@ -191,7 +204,7 @@ export function Despacho({ caso }: { caso: Detalle }) {
         <Evidencias fotos={caso.evidence} />
 
         {/* --- Cerrar --- */}
-        {!cerrado && tieneEvidencia && (
+        {enCurso && tieneEvidencia && (
           <div className="space-y-2 border-t pt-5">
             <Textarea
               value={nota}
@@ -248,21 +261,28 @@ export function Despacho({ caso }: { caso: Detalle }) {
  *
  * Es la parte que casi nadie construye, y si no se ve nadie sabe que existe.
  */
+/**
+ * Los tres numeros son **personas**, no mensajes: cada una recibe hasta tres
+ * avisos, y la API la cuenta una sola vez, en el grupo mas preocupante.
+ */
 function Avisos({ notificaciones }: { notificaciones: Detalle["notifications"] }) {
   const { sent, pending, failed } = notificaciones;
   if (sent + pending + failed === 0) return null;
+  const personas = (n: number) => (n === 1 ? "1 persona" : `${n} personas`);
 
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <span className="flex items-center gap-1.5 text-muted-foreground">
         <MailCheck className="size-4" />
-        {sent === 1 ? "Se avisó a 1 persona" : `Se avisó a ${sent} personas`}
+        Se avisó a {personas(sent)}
       </span>
-      {pending > 0 && <span className="text-xs text-muted-foreground">{pending} en camino</span>}
+      {pending > 0 && (
+        <span className="text-xs text-muted-foreground">{personas(pending)} por avisar</span>
+      )}
       {failed > 0 && (
         <span className="flex items-center gap-1 text-xs text-atencion">
           <TriangleAlert className="size-3" />
-          {failed} sin entregar
+          {failed === 1 ? "A 1 persona no le llegó" : `A ${failed} personas no les llegó`}
         </span>
       )}
     </p>

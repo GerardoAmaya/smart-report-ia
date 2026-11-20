@@ -101,6 +101,14 @@ class InboundChannel(Protocol):
         """Aviso fuera de banda. Fases 3 y 6."""
         ...
 
+    async def notify_photo(self, external_user_id: str, photo: bytes, caption: str) -> None:
+        """Aviso con foto: el de cierre, con la foto del arreglo como prueba.
+
+        `caption` es el mismo texto que iria solo. Un canal que no pueda mandar
+        fotos lo manda sin ella: la foto acompaña al aviso, no lo reemplaza.
+        """
+        ...
+
     async def ask(self, external_user_id: str, text: str, options: list[tuple[str, str]]) -> None:
         """Pregunta con opciones cerradas. `options` son pares (etiqueta, valor).
 

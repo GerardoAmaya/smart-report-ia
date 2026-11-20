@@ -227,17 +227,34 @@ def start(session: Session, caso: Case) -> int:
     return enqueue(session, caso, "in_progress")
 
 
+FALTA_EN_CURSO = "Primero hay que marcar que la cuadrilla ya está trabajando."
+
+
+def exigir_en_curso(caso: Case) -> None:
+    """La foto del arreglo y el cierre solo caben con el caso en curso.
+
+    Sin esto se podia ir de abierto a cerrado subiendo una foto, sin asignar a
+    nadie: quien reporto recibia «resuelto» sin haber sabido nunca que alguien
+    iba. El orden asignado → en curso → resuelto es lo que le dice que el
+    arreglo paso de verdad. Vive aqui y no en el tablero porque el tablero solo
+    no ofrece; quien decide es la API.
+    """
+    if caso.status != "in_progress":
+        raise NoSePuede(FALTA_EN_CURSO)
+
+
 def close(session: Session, caso: Case, nota: str | None, exigir_evidencia: bool = True) -> int:
     """Cierra el caso y encola el aviso a todos los que reportaron.
 
-    **Con foto de evidencia.** Cerrar sin foto convierte el cierre en una
-    afirmacion que nadie puede comprobar, y el tablero existe precisamente para
-    que las afirmaciones se puedan comprobar.
+    **Con foto de evidencia y con el caso en curso.** Cerrar sin foto convierte
+    el cierre en una afirmacion que nadie puede comprobar, y el tablero existe
+    precisamente para que las afirmaciones se puedan comprobar.
     """
     from app.models import CasePhoto
 
     if caso.status == "closed":
         raise NoSePuede("ese caso ya estaba cerrado")
+    exigir_en_curso(caso)
 
     if exigir_evidencia:
         tiene = session.execute(

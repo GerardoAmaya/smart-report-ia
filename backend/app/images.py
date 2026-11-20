@@ -77,6 +77,24 @@ def validate(data: bytes) -> ImagenValidada:
     )
 
 
+def para_aviso(data: bytes) -> bytes:
+    """La foto del arreglo, del tamaño que se manda por chat.
+
+    `thumbnail` reduce siempre hasta un ancho fijo; esta solo reduce lo que pasa
+    del lado mas largo permitido y nunca agranda, porque una foto chica
+    estirada no prueba mejor el arreglo.
+    """
+    with Image.open(io.BytesIO(data)) as img:
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+        lado = settings.notify_photo_width
+        img.thumbnail((lado, lado), Image.LANCZOS)
+
+        salida = io.BytesIO()
+        img.save(salida, format="JPEG", quality=settings.notify_photo_quality, optimize=True)
+        return salida.getvalue()
+
+
 def thumbnail(data: bytes) -> bytes:
     """Miniatura para la cola del tablero.
 

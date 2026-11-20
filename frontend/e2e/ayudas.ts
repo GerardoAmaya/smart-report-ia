@@ -181,7 +181,13 @@ export async function esperarA<T>(
 
 export const TELEGRAM_FALSO = process.env.E2E_TELEGRAM_URL ?? "http://localhost:8099";
 
-type Mensaje = { chat_id: string; texto: string; botones: { texto: string; data: string }[] };
+type Mensaje = {
+  chat_id: string;
+  texto: string;
+  botones: { texto: string; data: string }[];
+  /** Bytes de la foto, si el mensaje fue una. */
+  foto?: number;
+};
 
 /**
  * Lo que el bot le mando a una persona.

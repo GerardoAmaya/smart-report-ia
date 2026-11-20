@@ -209,6 +209,12 @@ class TelegramChannel:
         async with bot:
             await bot.send_message(chat_id=external_user_id, text=text)
 
+    async def notify_photo(self, external_user_id: str, photo: bytes, caption: str) -> None:
+        """La foto del arreglo con el aviso de cierre como pie."""
+        bot = self._bot()
+        async with bot:
+            await bot.send_photo(chat_id=external_user_id, photo=photo, caption=caption)
+
     async def edit_out_of_band(
         self, external_user_id: str, message_id: str, text: str, options: list[tuple[str, str]]
     ) -> None:

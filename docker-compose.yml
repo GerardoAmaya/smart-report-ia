@@ -65,10 +65,17 @@ services:
   # desplegar: el codigo no distingue, solo cambian las variables de entorno.
   # Nada lo escribe todavia; el trabajador que sube las fotos es de la fase 2.
   minio:
-    # MinIO retiro sus imagenes de Docker Hub: solo estan en quay.io.
-    # Version clavada y no latest: una imagen que cambia sola convierte
-    # "a mi me funciona" en una afirmacion sin fecha.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # MinIO dejo de publicar imagenes a finales de 2025: las de quay.io y Docker
+    # Hub ya no se descargan, y quien tenia la suya en cache no se entera hasta
+    # que CI o un clon nuevo revientan. Esta es el mismo MinIO compilado desde el
+    # codigo por Chainguard. Gratis solo da `latest`, asi que va clavada por
+    # digest: una imagen que cambia sola convierte "a mi me funciona" en una
+    # afirmacion sin fecha. El digest es el indice, con amd64 y arm64.
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    # Como root porque la imagen corre como 65532 y los volumenes que dejo el
+    # MinIO anterior son de root: sin esto arranca y muere con "file access
+    # denied". Es solo de desarrollo y no sale de la maquina.
+    user: "0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-smart_report_minio}
@@ -88,7 +95,9 @@ services:
   # en el arranque de la API evita que cada despliegue pida permiso de crear
   # buckets, que en R2 no queremos dar.
   minio_init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # La misma imagen del servidor: trae `mc` y `sh`, y una imagen menos es un
+    # registro menos que puede dejar de publicar.
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
     depends_on:
       minio:
         condition: service_healthy

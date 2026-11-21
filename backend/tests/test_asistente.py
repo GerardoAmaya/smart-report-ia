@@ -55,6 +55,7 @@ def test_lo_publico_es_solo_si_el_invitado_despacha(client, session, monkeypatch
         assert r.json() == {"demo_can_dispatch": valor}
     assert client.get("/public/stats").status_code == 404
 
+
 # --- La miniatura en la cola ---
 
 
@@ -400,4 +401,3 @@ def test_una_entrada_invalida_vuelve_como_error_al_modelo(session):
     assert es_error and "invalida" in contenido
     contenido, es_error = asistente.ejecutar(session, "borrar_todo", {})
     assert es_error
-

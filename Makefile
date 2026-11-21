@@ -38,8 +38,10 @@ e2e:           ## Pruebas extremo a extremo contra el sistema levantado
 e2e-up:        ## Solo levanta el sistema con el Telegram falso
 	@./scripts/e2e.sh --solo-levantar
 
-lint:         ## ruff, ESLint y tsc --noEmit
+lint:         ## ruff (reglas y formato), ESLint y tsc --noEmit
 	docker compose exec api ruff check .
+	# El formato tambien: CI lo revisa, y sin esto aqui pasaba y alla no.
+	docker compose exec api ruff format --check .
 	docker compose exec web npm run lint
 	docker compose exec web npm run typecheck
 

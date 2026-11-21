@@ -17,6 +17,13 @@
  * La del asistente hace **una pregunta real al modelo** (unos USD 0,006): una
  * respuesta inventada para la foto seria justo lo que este guion evita.
  *
+ * Contra produccion, con el invitado de solo lectura, por un tunel cuando la red
+ * filtra el dominio:
+ *
+ *   ssh -f -N -L 8443:127.0.0.1:443 ubuntu@SERVIDOR
+ *   BASE_URL=https://DOMINIO:8443 RESOLVER="MAP DOMINIO 127.0.0.1" \
+ *     DEMO_PASSWORD=... node scripts/capturas.mjs
+ *
  * Sale lo que haya en la base de desarrollo. No inventa datos: una captura con
  * casos falsos es una promesa, y este proyecto mide en vez de prometer.
  */
@@ -28,6 +35,8 @@ const PASSWORD = process.env.DEMO_PASSWORD;
 const DESTINO = process.env.DESTINO ?? "../docs/capturas";
 const SOLO = process.env.SOLO ? new Set(process.env.SOLO.split(",")) : null;
 const toca = (nombre) => !SOLO || SOLO.has(nombre);
+// El nombre del dominio se resuelve al tunel: asi el certificado sigue valiendo.
+const RESOLVER = process.env.RESOLVER;
 
 if (!PASSWORD) {
   console.error("Falta DEMO_PASSWORD: es la contraseña del usuario de prueba.");
@@ -40,7 +49,9 @@ const PESTANAS = [
   ["Mapa", "tablero-mapa.jpg"],
 ];
 
-const navegador = await chromium.launch();
+const navegador = await chromium.launch({
+  args: RESOLVER ? [`--host-resolver-rules=${RESOLVER}`] : [],
+});
 try {
   await mkdir(DESTINO, { recursive: true });
 
@@ -64,10 +75,20 @@ try {
   // Se espera al tablero y no a la URL: la navegacion es del lado del cliente
   // y no dispara un evento de carga que esperar.
   await pagina.getByRole("tab", { name: "Resumen", exact: true }).waitFor({ timeout: 20000 });
-  // El primer caso de la cola, para que la pestaña del caso no salga vacía.
-  // Sin `catch` a propósito: si esto falla, la captura saldría mal y es mejor
-  // enterarse aquí que descubrirlo en el README.
-  await pagina.locator("button", { hasText: "Alameda" }).first().click();
+  // El primer caso de la cola —el mas grave y mas reportado—, abierto por la
+  // URL. Antes se buscaba un caso por su direccion escrita aqui, y en otra base
+  // no existia. Sin `catch` a proposito: si no hay casos, la captura del caso
+  // saldria vacia y es mejor enterarse aqui que en el README.
+  // Desde el navegador y no con `pagina.request`: esa la hace Node, que no ve
+  // la regla de resolucion del tunel y se va al servidor real por otro puerto.
+  const cola = await pagina.evaluate(
+    async (base) => (await fetch(`${base}/board/cases`, { credentials: "include" })).json(),
+    BASE,
+  );
+  const primero = cola.cases[0];
+  if (!primero) throw new Error("No hay casos: la captura del caso saldria vacia.");
+  await pagina.goto(`${BASE}/?caso=${primero.id}`);
+  await pagina.getByRole("tab", { name: "Resumen", exact: true }).waitFor({ timeout: 20000 });
   await pagina.waitForTimeout(1200);
 
   for (const [pestana, nombre] of PESTANAS) {
@@ -83,6 +104,16 @@ try {
       ...(nombre.endsWith(".jpg") ? { quality: 82 } : {}),
     });
     console.log(`  ${DESTINO}/${nombre}`);
+  }
+
+  if (toca("tablero-mapa-3d")) {
+    await pagina.getByRole("tab", { name: "Mapa", exact: true }).click();
+    await pagina.getByRole("button", { name: /^3d$/i }).click();
+    // Encuadre, columnas que crecen y edificios: unos segundos.
+    await pagina.waitForTimeout(6000);
+    await pagina.screenshot({ path: `${DESTINO}/tablero-mapa-3d.jpg`, quality: 82 });
+    console.log(`  ${DESTINO}/tablero-mapa-3d.jpg`);
+    await pagina.getByRole("button", { name: /^2d$/i }).click();
   }
 
   if (toca("asistente")) {

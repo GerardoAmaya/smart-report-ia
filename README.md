@@ -120,16 +120,25 @@ el tiempo. Se actualiza solo, sin recargar.
 
 ![La cola de casos, métricas y la entrada de reportes en el tiempo](docs/capturas/tablero-resumen.png)
 
-Un caso abierto: la foto de quien reportó, la dirección resuelta, y el panel de
-despacho, que no deja cerrar sin foto del arreglo porque un cierre sin
+Un caso cerrado, de punta a punta: la foto de quien reportó, la dirección
+resuelta, la cuadrilla, cuándo se asignó y se resolvió, **la foto del arreglo**
+y a cuántas personas se les avisó. No se cierra sin esa foto: un cierre sin
 evidencia es una afirmación que nadie puede comprobar.
 
-![Detalle de un caso con su foto, dirección y el panel de despacho](docs/capturas/tablero-caso.png)
+![Caso cerrado con la foto del bache, la del arreglo y su despacho](docs/capturas/tablero-caso.png)
 
-El mapa. El tamaño del pin dice cuántas personas reportan lo mismo: un mapa de
-puntos iguales tira a la basura justo la información que importa.
+El mapa, con la paleta del proyecto: agua, parques y edificios con color, pero
+sin rojo ni ámbar, que quedan para lo urgente. El tamaño del pin dice cuántas
+personas reportan lo mismo, y lo urgente late.
 
 ![Mapa de casos sobre San Salvador](docs/capturas/tablero-mapa.jpg)
+
+Y en **3D**: los edificios en relieve y los casos como columnas por zona, más
+altas donde más gente reporta y rojas donde hay algo urgente. Encuadra solo la
+zona con más reportes, las columnas crecen al entrar, y si nadie lo toca la
+cámara gira despacio. Sin librerías de 3D: es el mismo MapLibre.
+
+![Mapa 3D con edificios en relieve y la columna de un caso urgente](docs/capturas/tablero-mapa-3d.jpg)
 
 **Pregúntale al tablero.** Un panel donde se escribe «¿qué quedó pendiente?» o
 «resumen de la semana», y el modelo contesta con los datos del sistema y
@@ -149,11 +158,9 @@ resumen trae un feed con lo que ocurre de verdad —reportes que entran, casos q
 se juntan, asignaciones, cierres y a cuántas personas se avisó—, que se mueve
 solo por los mismos avisos de Postgres que el resto del tablero.
 
-El mapa tiene **vista 3D**: los edificios en relieve y los casos como columnas
-por zona, más altas donde más gente reporta y rojas donde hay algo urgente.
-Encuadra solo la zona con más reportes, las columnas crecen al entrar, y si
-nadie lo toca la cámara gira despacio. Sin librerías de 3D: es el mismo
-MapLibre, y el tablero pesa unos 10 KB más.
+En el celular el tablero cambia de forma: una barra abajo con Cola, Resumen,
+Caso y Mapa, y cada vista a pantalla completa. Quien despacha desde la calle
+puede asignar, marcar en curso y subir la foto del arreglo desde el teléfono.
 
 > Las capturas del tablero las saca un guion contra lo que haya en la base, no
 > una mano: `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`.

@@ -48,6 +48,10 @@ const GLOBO_VISIBLE_MS = 6_500;
 const MIRADA_QUIETA_MS = 3_000;
 const SUENO_MS = 60_000;
 
+// Contorno lavanda del cuerpo, fijo como el cuerpo: con el borde del tema, en
+// oscuro el contorno era gris oscuro sobre gris oscuro.
+const CONTORNO = "#c4badf";
+
 // Cuanto se pueden mover las pupilas dentro del visor, en unidades del dibujo.
 const RECORRIDO_X = 4.2;
 const RECORRIDO_Y = 2.8;
@@ -643,12 +647,13 @@ function DibujoRobot({
   return (
     <svg viewBox="0 0 80 88" className="size-full drop-shadow-md" aria-hidden>
       <defs>
+        {/* Blanco con un toque lavanda, igual en claro y en oscuro. Tomaba el
+            color de las tarjetas, y en oscuro el cuerpo quedaba casi negro y el
+            robot se perdia contra el fondo. Un juguete blanco se ve en los dos. */}
         <linearGradient id={id("cuerpo")} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--card)" />
-          <stop
-            offset="1"
-            stopColor="color-mix(in oklab, var(--card) 82%, var(--tinta))"
-          />
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.55" stopColor="#f3f0fd" />
+          <stop offset="1" stopColor="#ddd6f5" />
         </linearGradient>
         <linearGradient id={id("casco")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#dd9446" />
@@ -680,7 +685,7 @@ function DibujoRobot({
         height="16"
         rx="4"
         fill={`url(#${id("cuerpo")})`}
-        stroke="var(--border)"
+        stroke={CONTORNO}
       />
       {/* Brazo derecho: saluda. Gira desde el hombro. */}
       <motion.g
@@ -699,7 +704,7 @@ function DibujoRobot({
           height="16"
           rx="4"
           fill={`url(#${id("cuerpo")})`}
-          stroke="var(--border)"
+          stroke={CONTORNO}
         />
       </motion.g>
 
@@ -711,7 +716,7 @@ function DibujoRobot({
         height="28"
         rx="12"
         fill={`url(#${id("cuerpo")})`}
-        stroke="var(--border)"
+        stroke={CONTORNO}
       />
       <rect x="29" y="61" width="22" height="13" rx="6.5" fill="var(--verde)" />
       <text
@@ -794,7 +799,7 @@ function DibujoRobot({
           height="38"
           rx="19"
           fill={`url(#${id("cuerpo")})`}
-          stroke="var(--border)"
+          stroke={CONTORNO}
         />
 
         {/* Casco de obra color cono, con su franja reflectante. */}

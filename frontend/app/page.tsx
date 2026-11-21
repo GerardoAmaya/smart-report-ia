@@ -7,6 +7,7 @@
  * mismo panel. No en paginas separadas: quien despacha vive en la cola, y
  * mandarlo a otra pagina por cada caso le hace perder el sitio cada vez.
  */
+import { AnimatePresence, motion } from "motion/react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -159,23 +160,37 @@ function Tablero() {
         </aside>
 
         <main className="min-w-0 flex-1 overflow-hidden">
-          {vista === "mapa" && (
-            <Mapa
-              seleccionado={seleccionado}
-              onElegir={elegir}
-              oscuro={resolvedTheme === "dark"}
-            />
-          )}
-          {vista === "resumen" && (
-            <div className="h-full overflow-y-auto">
-              <Metricas />
-            </div>
-          )}
-          {vista === "detalle" && (
-            <div className="h-full overflow-y-auto">
-              <Detalle casoId={seleccionado} />
-            </div>
-          )}
+          {/* Un fundido corto al cambiar de vista: dice que cambio el contenido
+              sin hacer esperar. `wait` para que nunca convivan dos vistas, que
+              con el mapa seria dos lienzos WebGL a la vez. */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={vista}
+              className="h-full"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: "easeOut" }}
+            >
+              {vista === "mapa" && (
+                <Mapa
+                  seleccionado={seleccionado}
+                  onElegir={elegir}
+                  oscuro={resolvedTheme === "dark"}
+                />
+              )}
+              {vista === "resumen" && (
+                <div className="h-full overflow-y-auto">
+                  <Metricas alElegirCaso={elegir} />
+                </div>
+              )}
+              {vista === "detalle" && (
+                <div className="h-full overflow-y-auto">
+                  <Detalle casoId={seleccionado} />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

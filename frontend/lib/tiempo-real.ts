@@ -21,16 +21,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // Que recargar segun donde ocurrio el cambio. Explicito y no "recargalo todo":
 // una foto nueva no tiene por que rehacer la consulta del mapa.
 const AFECTA: Record<string, string[]> = {
-  cases: ["casos", "caso", "mapa", "metricas"],
-  reports: ["casos", "caso", "mapa", "metricas"],
+  cases: ["casos", "caso", "mapa", "metricas", "actividad"],
+  reports: ["casos", "caso", "mapa", "metricas", "actividad"],
   classifications: ["caso", "metricas"],
-  notifications: ["caso"],
+  notifications: ["caso", "actividad"],
   case_photos: ["caso"],
 };
 
 const AGRUPAR_MS = 250;
 
 export type EstadoFlujo = "conectando" | "en-vivo" | "sin-conexion";
+
+/** Evento del navegador que se emite con cada cambio recibido. */
+export const EVENTO_CAMBIO = "smart-report:cambio";
 
 export function useTiempoReal(): EstadoFlujo {
   const cliente = useQueryClient();
@@ -55,6 +58,9 @@ export function useTiempoReal(): EstadoFlujo {
 
     fuente.addEventListener("cambio", (e) => {
       setEstado("en-vivo");
+      // Para quien quiera enterarse sin volver a pedir datos: el indicador
+      // "En vivo" late una vez por cada cambio que llega.
+      window.dispatchEvent(new Event(EVENTO_CAMBIO));
       try {
         const { tabla } = JSON.parse((e as MessageEvent).data);
         for (const clave of AFECTA[tabla] ?? []) pendientes.current.add(clave);

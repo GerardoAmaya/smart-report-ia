@@ -8,6 +8,7 @@
  * esconder un boton no impide llamarla.
  */
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { createContext, useContext, useState } from "react";
 
 import { api, type Perfil, SinSesion } from "./api";
@@ -67,7 +68,12 @@ export function Proveedores({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={cliente}>
-      <Proveedor>{children}</Proveedor>
+      {/* Quien pidio menos movimiento en su sistema no ve desplazamientos ni
+          escalas en ninguna parte: se respeta aqui una vez y no componente por
+          componente, donde siempre se olvida uno. */}
+      <MotionConfig reducedMotion="user">
+        <Proveedor>{children}</Proveedor>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

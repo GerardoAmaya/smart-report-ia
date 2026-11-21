@@ -6,9 +6,12 @@
  * Se enseña porque un tablero que dejo de actualizarse y no lo dice es peor que
  * uno que hay que recargar a mano: quien lo mira sigue creyendo lo que ve.
  */
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { EstadoFlujo } from "@/lib/tiempo-real";
+import { EVENTO_CAMBIO, type EstadoFlujo } from "@/lib/tiempo-real";
 
 const TEXTO: Record<EstadoFlujo, string> = {
   conectando: "Conectando…",
@@ -17,16 +20,34 @@ const TEXTO: Record<EstadoFlujo, string> = {
 };
 
 export function EnVivo({ estado }: { estado: EstadoFlujo }) {
+  // Un latido por cada cambio que llega, y nada mas. Antes latia en bucle
+  // mientras hubiera conexion: un movimiento que no para deja de decir nada, y
+  // en una pantalla que se mira ocho horas, distrae. Asi el latido significa
+  // "acaba de entrar algo".
+  const [latido, setLatido] = useState(0);
+  const quieto = useReducedMotion();
+  useEffect(() => {
+    const latir = () => setLatido((n) => n + 1);
+    window.addEventListener(EVENTO_CAMBIO, latir);
+    return () => window.removeEventListener(EVENTO_CAMBIO, latir);
+  }, []);
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="relative flex size-2">
-            {estado === "en-vivo" && (
-              // Solo late cuando de verdad esta escuchando: una animacion que
-              // sigue cuando la conexion se corto es una mentira en pantalla.
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
-            )}
+            <AnimatePresence>
+              {estado === "en-vivo" && latido > 0 && !quieto && (
+                <motion.span
+                  key={latido}
+                  className="absolute inline-flex size-full rounded-full bg-primary"
+                  initial={{ scale: 1, opacity: 0.7 }}
+                  animate={{ scale: 3.2, opacity: 0 }}
+                  transition={{ duration: 0.9, ease: "easeOut" }}
+                />
+              )}
+            </AnimatePresence>
             <span
               className={cn(
                 "relative inline-flex size-2 rounded-full",

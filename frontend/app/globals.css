@@ -195,6 +195,147 @@
 }
 
 /*
+ * Aurora del resumen: tres manchas de verde y ambar, muy difuminadas, que
+ * derivan en ciclos de 21 a 30 segundos. Con duraciones distintas no se
+ * repiten nunca igual, y tan lentas que no se notan mientras se lee: se notan
+ * al volver la vista. En CSS y no en JS: un bucle de treinta segundos en una
+ * pantalla abierta ocho horas no puede costar un render por cuadro.
+ */
+:root {
+  /* En claro hace falta mas: el verde sobre el gris claro se lava enseguida. */
+  --aurora-opacidad: 0.45;
+}
+.dark {
+  /* En oscuro, mas presente: sobre asfalto de noche el color se apaga. */
+  --aurora-opacidad: 0.3;
+}
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.aurora-mancha {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: var(--aurora-opacidad);
+  will-change: transform;
+  animation: aurora-deriva 26s ease-in-out infinite alternate;
+}
+.aurora-verde {
+  width: 52%;
+  left: -10%;
+  top: -20%;
+  background: radial-gradient(circle, var(--primary), transparent 68%);
+}
+.aurora-ambar {
+  width: 40%;
+  right: -6%;
+  top: 8%;
+  background: radial-gradient(circle, var(--atencion), transparent 68%);
+  animation-duration: 21s;
+  animation-delay: -7s;
+}
+.aurora-verde-2 {
+  width: 46%;
+  left: 30%;
+  bottom: -26%;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--primary) 70%, var(--atencion)),
+    transparent 68%
+  );
+  animation-duration: 30s;
+  animation-delay: -13s;
+}
+@keyframes aurora-deriva {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(12%, 9%) scale(1.12);
+  }
+  100% {
+    transform: translate(-8%, 14%) scale(0.94);
+  }
+}
+
+/*
+ * Borde que brilla: un tramo de gradiente conico que recorre el contorno.
+ * Recortado con mascara al pixel del borde, asi funciona sobre una tarjeta de
+ * vidrio —translucida— sin teñirle el interior. `@property` deja animar el
+ * angulo; sin soporte, el borde queda quieto y sigue viendose.
+ */
+@property --brillo-angulo {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.borde-brillo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--brillo-angulo),
+    transparent 0deg 240deg,
+    color-mix(in oklab, var(--primary) 85%, transparent) 300deg,
+    var(--atencion) 340deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: borde-gira 8s linear infinite;
+}
+.borde-brillo-atencion::before {
+  background: conic-gradient(
+    from var(--brillo-angulo),
+    transparent 0deg 220deg,
+    color-mix(in oklab, var(--atencion) 50%, transparent) 290deg,
+    var(--atencion) 345deg,
+    transparent 360deg
+  );
+  animation-duration: 6s;
+}
+@keyframes borde-gira {
+  to {
+    --brillo-angulo: 360deg;
+  }
+}
+
+/*
+ * Foco bajo el cursor: un circulo de luz muy tenue que sigue al raton dentro
+ * de la tarjeta. Las coordenadas las escribe el componente en el elemento.
+ */
+.foco::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--foco-x, 50%) var(--foco-y, 50%),
+    color-mix(in oklab, var(--primary) 9%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.foco:hover::after {
+  opacity: 1;
+}
+
+/*
  * Movimiento con intencion, pero **nada que estorbe al trabajo**. Quien mira
  * esto ocho horas no puede esperar a que algo termine de aparecer.
  */
@@ -207,4 +348,65 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /* La aurora y los brillos, quietos del todo: con la regla de arriba darian
+     un salto al final de su recorrido en vez de quedarse donde empiezan. */
+  .aurora-mancha,
+  .borde-brillo::before {
+    animation: none !important;
+  }
+}
+
+/*
+ * Brillo de carga: una franja que cruza el esqueleto. Dice "esto esta llegando"
+ * mejor que el parpadeo de opacidad, que se lee como algo roto. Con menos
+ * movimiento pedido, la regla de arriba lo deja quieto.
+ */
+.esqueleto {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--background) 55%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: esqueleto-brillo 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto-brillo {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
+}
+
+/*
+ * El aviso de las columnas del mapa, con los colores del tema. MapLibre lo trae
+ * blanco de fabrica, y en oscuro el texto heredaba el color claro: quedaba un
+ * cuadro blanco con letras casi invisibles.
+ */
+.maplibregl-popup-content {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--popover);
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--popover);
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--popover);
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--popover);
 }

@@ -14,6 +14,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { ImageOff, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, type Caso } from "@/lib/api";
@@ -47,6 +48,24 @@ export function Cola({
     // segundos sin que haya cambiado nada es gasto, y dos mecanismos que
     // hacen lo mismo se contradicen el dia que uno falla.
   });
+
+  // Los casos que entraron mientras se miraba la cola, para iluminarlos. En la
+  // primera carga no se marca nada: todo seria "nuevo" y el resplandor dejaria
+  // de significar algo. Cambiar de filtro tampoco cuenta como llegada.
+  const conocidos = useRef<{ filtro: string; ids: Set<string> } | null>(null);
+  const [nuevos, setNuevos] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!data) return;
+    const ids = data.cases.map((c) => c.id);
+    const antes = conocidos.current;
+    conocidos.current = { filtro, ids: new Set(ids) };
+    if (!antes || antes.filtro !== filtro) return;
+    const llegaron = ids.filter((id) => !antes.ids.has(id));
+    if (llegaron.length === 0) return;
+    setNuevos(new Set(llegaron));
+    const t = setTimeout(() => setNuevos(new Set()), 2200);
+    return () => clearTimeout(t);
+  }, [data, filtro]);
 
   return (
     <div className="flex h-full flex-col">
@@ -96,6 +115,7 @@ export function Cola({
             <Item
               key={caso.id}
               caso={caso}
+              nuevo={nuevos.has(caso.id)}
               activo={caso.id === seleccionado}
               onElegir={() => onElegir(caso.id)}
             />
@@ -108,10 +128,12 @@ export function Cola({
 
 function Item({
   caso,
+  nuevo,
   activo,
   onElegir,
 }: {
   caso: Caso;
+  nuevo: boolean;
   activo: boolean;
   onElegir: () => void;
 }) {
@@ -130,6 +152,20 @@ function Item({
         activo ? "bg-card" : "hover:bg-card/60",
       )}
     >
+      {/* Resplandor de llegada: se enciende y se apaga solo, en unos dos
+          segundos. Lo bastante para ver que entro, no tanto que estorbe. */}
+      <AnimatePresence>
+        {nuevo && (
+          <motion.span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-primary/15 shadow-[inset_3px_0_0_var(--primary)]"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 2, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>
       {/* Barra de acento en el seleccionado: dice donde estas sin cambiar el
           color del texto, que empeoraria el contraste. */}
       {activo && (

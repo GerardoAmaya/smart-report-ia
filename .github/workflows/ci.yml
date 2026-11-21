@@ -84,6 +84,15 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
 
+      - name: Dependencias sin vulnerabilidades conocidas
+        # OWASP A06. Las versiones van fijadas, y fijar sin mirar es quedarse
+        # para siempre con lo que tenga un hueco: asi estuvieron Pillow 12.3.0
+        # y Authlib 1.8.0, con 50 vulnerabilidades entre las dos. Audita lo que
+        # declara pyproject, no el entorno del runner. Los avisos de PyPI no
+        # traen severidad, asi que falla con cualquiera: una excepcion se
+        # declara con --ignore-vuln y su motivo, a la vista.
+        run: pip-audit .
+
       - name: Migraciones en ambas direcciones
         # Una migracion que sube pero no baja se descubre el dia que hay que
         # revertir en produccion. Se comprueba en cada commit.
@@ -126,6 +135,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
+
+      - name: Dependencias sin vulnerabilidades altas
+        # OWASP A06. Solo lo que viaja a produccion (--omit=dev): las
+        # herramientas de compilar no corren en el servidor. Y desde "high":
+        # un aviso moderado de una dependencia de una dependencia no puede
+        # bloquear un arreglo urgente; esos los trae Dependabot.
+        run: npm audit --omit=dev --audit-level=high
+
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build

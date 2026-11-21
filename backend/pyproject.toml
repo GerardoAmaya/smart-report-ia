@@ -21,9 +21,12 @@ dependencies = [
     "boto3==1.43.93",
     # Miniaturas y validacion. Abrir la imagen comprueba mas que olfatear
     # sus primeros bytes, y ahorra libmagic como dependencia del sistema.
-    "pillow==12.3.0",
+    # 13.0.0 y no 12.x: pip-audit encontro 42 vulnerabilidades en 12.3.0, y
+    # Pillow es lo que abre fotos que manda cualquiera.
+    "pillow==13.0.0",
     # Entrada con Google. Se construye el cliente al vuelo, no al importar.
-    "authlib==1.8.0",
+    # 1.9.1: la version minima que corrige las 8 vulnerabilidades de 1.8.0.
+    "authlib==1.9.1",
     # Firma la cookie de sesion de Starlette.
     "itsdangerous==2.2.0",
 ]
@@ -32,6 +35,9 @@ dependencies = [
 dev = [
     "pytest==9.1.1",
     "ruff==0.16.7",
+    # Revisa las dependencias contra la base de vulnerabilidades de PyPI. En el
+    # extra de desarrollo y no en la imagen: corre en CI, no en el servidor.
+    "pip-audit==2.10.1",
 ]
 
 [tool.setuptools.packages.find]

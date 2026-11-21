@@ -1,0 +1,71 @@
+# Actualizaciones de dependencias (OWASP A06).
+#
+# Las versiones van fijadas a proposito —una que cambia sola convierte "a mi me
+# funciona" en una afirmacion sin fecha—, y fijar exige que alguien avise cuando
+# hay que subir. CI audita y frena lo vulnerable; esto trae el arreglo hecho.
+#
+# Semanal y agrupado: un PR por ecosistema y por semana, no uno por paquete. Con
+# pocos PRs abiertos se revisan; con veinte se ignoran.
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      backend:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      frontend:
+        patterns: ["*"]
+        # Los mayores van aparte: rompen cosas y merecen su propio PR.
+        update-types: ["minor", "patch"]
+    ignore:
+      # Techos documentados en CLAUDE.md: typescript-eslint (via
+      # eslint-config-next) declara `typescript <6.1.0`, y eslint-plugin-react
+      # declara `eslint ^9.7` (con ESLint 10 el linter revienta con un
+      # TypeError). Se sube a mano cuando suban esos techos.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    groups:
+      imagenes:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    groups:
+      acciones:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"

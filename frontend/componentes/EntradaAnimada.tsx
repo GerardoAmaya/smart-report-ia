@@ -19,9 +19,21 @@
  *   sitio, sin direccion ni numero: un pin que cayera en sitios distintos
  *   pareceria un reporte de verdad, y aqui no se publican datos inventados.
  */
-import { motion, useReducedMotion, type Transition } from "motion/react";
-import type { ReactNode } from "react";
+import {
+  motion,
+  useReducedMotion,
+  type Transition,
+} from "motion/react";
+import {
+  BadgeCheck,
+  Camera,
+  Layers,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
+import { type ReactNode } from "react";
 
+import { MagicCard } from "@/components/ui/magic-card";
 import { cn } from "@/lib/utils";
 
 /** Duracion cero cuando el sistema pide movimiento reducido. */
@@ -145,10 +157,71 @@ export function TarjetaConBrillo({
           transition={{ duration: 9, ease: "linear", repeat: Infinity }}
           className="absolute top-1/2 left-1/2 aspect-square w-[160%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0deg,transparent_250deg,var(--primary)_310deg,var(--atencion)_340deg,transparent_360deg)] opacity-70 motion-reduce:hidden"
         />
-      <div className="relative rounded-[calc(var(--radius-xl)-1px)] bg-card">
+      {/* El foco que sigue al cursor (MagicCard). `--color-background` se
+          redefine a la superficie de tarjeta: el componente pinta su fondo con
+          esa variable, y sin esto la tarjeta quedaba del gris de la pagina. */}
+      <MagicCard
+        gradientSize={260}
+        gradientFrom="var(--primary)"
+        gradientTo="var(--atencion)"
+        gradientColor="color-mix(in oklab, var(--primary) 14%, transparent)"
+        gradientOpacity={1}
+        className="relative rounded-[calc(var(--radius-xl)-1px)] [--color-background:var(--card)]"
+      >
         {children}
-      </div>
+      </MagicCard>
     </motion.div>
+  );
+}
+
+/**
+ * Como funciona, en tres pasos que se leen de un vistazo.
+ *
+ * Antes habia una palabra que rotaba y una cinta con seis pasos en marquesina:
+ * se movia mucho y explicaba poco. Quien llega por primera vez tiene que
+ * entender que es esto en dos segundos, y eso se logra con tres frases quietas.
+ * Solo entran en cascada al cargar.
+ */
+const PASOS: { icono: LucideIcon; texto: string }[] = [
+  { icono: Camera, texto: "Foto y ubicación por Telegram" },
+  { icono: Layers, texto: "Se junta con los reportes iguales" },
+  { icono: BadgeCheck, texto: "Al arreglarse, todos reciben la foto" },
+];
+
+export function PasosDeEntrada({ retraso = 0, className }: { retraso?: number; className?: string }) {
+  const quieto = useReducedMotion();
+  return (
+    <ol aria-label="Cómo funciona" className={cn("space-y-3", className)}>
+      {PASOS.map(({ icono: Icono, texto }, i) => (
+        <motion.li
+          key={texto}
+          initial={quieto ? false : { opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={quieto ? { duration: 0 } : { delay: retraso + i * 0.12, duration: 0.4, ease: "easeOut" }}
+          className="flex items-center gap-3 text-foreground"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/15">
+            <Icono className="size-4" aria-hidden />
+          </span>
+          <span className="text-pretty lg:text-lg">{texto}</span>
+        </motion.li>
+      ))}
+    </ol>
+  );
+}
+
+/** Una pildora con texto que brilla al pasar la luz: la etiqueta de la marca. */
+export function PildoraDeMarca({ children }: { children: ReactNode }) {
+  return (
+    <span className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-xs font-medium text-primary">
+      <Sparkles className="size-3.5" aria-hidden />
+      <span className="relative">{children}</span>
+      {/* La luz que cruza: CSS puro, quieta con movimiento reducido. */}
+      <span
+        aria-hidden
+        className="animate-shiny-text pointer-events-none absolute inset-0 bg-linear-to-r from-transparent via-white/45 via-50% to-transparent bg-size-[60%_100%] bg-no-repeat [--shiny-width:60%] dark:via-white/15"
+      />
+    </span>
   );
 }
 

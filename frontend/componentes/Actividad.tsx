@@ -118,7 +118,13 @@ export function Actividad({
         )}
 
         {data && data.length > 0 && (
-          <ol className="space-y-0.5">
+          <ol className="relative space-y-0.5">
+            {/* La via que une los eventos: el feed se lee como una linea de
+                tiempo, de lo ultimo hacia atras, no como una lista suelta. */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute top-4 bottom-4 left-[21px] w-px bg-gradient-to-b from-border via-border to-transparent"
+            />
             <AnimatePresence initial={false}>
               {data.map((evento) => (
                 <Fila
@@ -151,15 +157,21 @@ function Fila({
   return (
     <motion.li
       layout={!reducido}
-      initial={{ opacity: 0, x: -12, height: 0 }}
-      animate={{ opacity: 1, x: 0, height: "auto" }}
+      // Entra con un muelle corto, como las listas animadas de Magic UI: el
+      // evento nuevo "cae" en su sitio en vez de aparecer de golpe.
+      initial={{ opacity: 0, y: -8, scale: 0.97, height: 0 }}
+      animate={{ opacity: 1, y: 0, scale: 1, height: "auto" }}
       exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      transition={
+        reducido
+          ? { duration: 0 }
+          : { type: "spring", stiffness: 380, damping: 32, opacity: { duration: 0.2 } }
+      }
     >
       <button
         type="button"
         onClick={alElegir}
-        className="relative flex w-full items-start gap-3 overflow-hidden rounded-lg px-2 py-2 text-left transition-colors hover:bg-card"
+        className="group relative flex w-full items-start gap-3 overflow-hidden rounded-lg px-2 py-2 text-left transition-colors hover:bg-card"
       >
         {/* El destello: una franja que se apaga sola. Dice "esto acaba de llegar"
             sin quedarse parpadeando sobre algo que hay que leer. */}
@@ -172,8 +184,11 @@ function Fila({
             transition={{ duration: DESTELLO_MS / 1000, ease: "easeOut" }}
           />
         )}
-        <span className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full", tono)}>
-          <Icono className="size-3.5" />
+        {/* El anillo del color de la superficie tapa la via detras del icono. */}
+        <span className="relative mt-0.5 flex size-7 shrink-0 rounded-full bg-card ring-4 ring-card transition-transform duration-200 group-hover:scale-110">
+          <span className={cn("flex size-full items-center justify-center rounded-full", tono)}>
+            <Icono className="size-3.5" />
+          </span>
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm leading-snug">{evento.texto}</span>

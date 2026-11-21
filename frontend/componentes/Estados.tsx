@@ -60,8 +60,16 @@ export function Vacio({
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
-      <div className="mb-4 rounded-full bg-muted p-3">
-        <Icono className="size-5 text-muted-foreground" />
+      {/* Un icono que flota sobre una trama de puntos: un vacio que se ve
+          tranquilo, no roto. Con movimiento reducido se queda quieto. */}
+      <div className="relative mb-5 flex size-20 items-center justify-center">
+        <div
+          aria-hidden
+          className="trama-puntos absolute inset-0 rounded-full [mask-image:radial-gradient(circle,#000_30%,transparent_72%)]"
+        />
+        <div className="flotar relative rounded-2xl border bg-card p-3 shadow-sm">
+          <Icono className="size-5 text-primary" />
+        </div>
       </div>
       <p className="text-sm font-medium">{titulo}</p>
       <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{detalle}</p>

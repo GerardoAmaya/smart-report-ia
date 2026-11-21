@@ -22,7 +22,9 @@ export function Severidad({ valor, className }: { valor: string | null; classNam
           className,
         )}
       >
-        <span aria-hidden className="size-1.5 rounded-full bg-urgente" />
+        {/* Late despacio, como en el mapa: lo urgente es lo unico que se mueve
+            en la cola, asi que el pulso siempre significa lo mismo. */}
+        <span aria-hidden className="pulso-urgente size-1.5 rounded-full bg-urgente" />
         {severidad(valor)}
       </Badge>
     );

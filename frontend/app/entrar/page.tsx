@@ -35,6 +35,8 @@ import {
   EntraEnCascada,
   LineaPintada,
   LogoQueCae,
+  PasosDeEntrada,
+  PildoraDeMarca,
   PinQueLlega,
   TarjetaConBrillo,
 } from "@/componentes/EntradaAnimada";
@@ -101,7 +103,7 @@ export default function Entrar() {
               opaco a la izquierda, donde esta todo lo que hay que leer, y abierto
               hacia la derecha: con un velo parejo los nombres de las colonias se
               mezclaban con el texto. */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background from-35% via-background/90 via-60% to-background/35" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background from-55% via-background/85 via-72% to-background/30" />
           {/* Sobre la parte del mapa que el velo deja ver, lejos del texto. */}
           <PinQueLlega className="top-[44%] left-[78%]" />
         </div>
@@ -117,22 +119,26 @@ export default function Entrar() {
         </div>
 
         <div className="relative max-w-xl">
+          <EntraEnCascada retraso={0.05}>
+            <PildoraDeMarca>Reportes ciudadanos con IA</PildoraDeMarca>
+          </EntraEnCascada>
           <EntraEnCascada retraso={0.15}>
-            <h1 className="text-3xl leading-[1.05] font-semibold tracking-tight text-balance lg:text-5xl">
-              Lo que ves en la calle,{" "}
-              <span className="text-primary">atendido.</span>
+            <h1 className="mt-5 text-3xl leading-[1.05] font-semibold tracking-tight text-balance lg:text-[3.4rem]">
+              Los problemas de la calle,{" "}
+              <span className="texto-degradado">reportados con una foto.</span>
             </h1>
           </EntraEnCascada>
           <LineaPintada retraso={0.45} className="mt-6" />
           <EntraEnCascada retraso={0.65}>
             <p className="mt-6 max-w-md text-pretty text-muted-foreground lg:text-lg">
-              Una foto por Telegram. Quienes reportan lo mismo quedan en un solo
-              caso, y cuando se arregla, a todos les llega la foto del arreglo.
+              Los vecinos mandan una foto por Telegram. El sistema junta los reportes
+              del mismo problema y la cuadrilla lo atiende.
             </p>
           </EntraEnCascada>
+          <PasosDeEntrada retraso={0.85} className="mt-7" />
         </div>
 
-        <EntraEnCascada retraso={0.85} className="relative space-y-6">
+        <EntraEnCascada retraso={1.2} className="relative space-y-6">
           <a
             href="https://t.me/smartreport_sv_bot"
             target="_blank"
@@ -147,7 +153,18 @@ export default function Entrar() {
       </section>
 
       {/* --- Entrar --- */}
-      <section className="relative flex items-center justify-center px-6 py-12 lg:px-12">
+      <section className="relative flex items-center justify-center overflow-hidden px-6 py-12 lg:px-12">
+        {/* Trama de puntos que se apaga hacia los bordes, y un halo verde detras
+            de la tarjeta: le dan profundidad a la mitad que antes era un plano
+            gris, sin competir con el formulario. */}
+        <div
+          aria-hidden
+          className="trama-puntos pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,#000_15%,transparent_70%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-1/2 size-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
+        />
         {/* Fijo arriba en el telefono: apilado, el borde de esta seccion cae a
             media pagina y el boton quedaba flotando en medio de la nada. */}
         <div className="fixed top-3 right-3 z-10 lg:absolute lg:top-4 lg:right-4">
@@ -167,7 +184,7 @@ export default function Entrar() {
             </div>
 
             <div className="space-y-2">
-              <Button asChild variant="outline" className="h-11 w-full text-sm">
+              <Button asChild variant="outline" className="boton-brillo h-11 w-full text-sm transition-shadow hover:shadow-md">
                 <a href={api.urlEntrarConGoogle()}>
                   <MarcaGoogle className="size-4" />
                   Entrar con Google
@@ -205,7 +222,7 @@ export default function Entrar() {
               <Button
                 type="submit"
                 disabled={enviando || !password}
-                className="h-10 w-full"
+                className="boton-brillo h-10 w-full transition-shadow hover:shadow-md hover:shadow-primary/25"
               >
                 <Eye className="size-4" />
                 {enviando ? "Entrando…" : "Entrar a mirar"}

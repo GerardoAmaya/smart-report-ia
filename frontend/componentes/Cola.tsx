@@ -96,7 +96,11 @@ export function Cola({
         ))}
       </div>
 
-      <ScrollArea className="flex-1">
+      {/* Radix envuelve el contenido en un `display: table` que crece con el
+          texto: la direccion larga se salia por el borde sin puntos
+          suspensivos. Como bloque, el ancho lo pone la columna y `truncate`
+          vuelve a funcionar. */}
+      <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
         {isLoading && <CargandoCola />}
         {error && <Fallo mensaje={(error as Error).message} reintentar={() => refetch()} />}
         {data?.cases.length === 0 && (
@@ -148,10 +152,18 @@ function Item({
       onClick={onElegir}
       aria-current={activo ? "true" : undefined}
       className={cn(
-        "relative block w-full overflow-hidden border-b px-4 py-3 text-left transition-colors",
-        activo ? "bg-card" : "hover:bg-card/60",
+        "group relative block w-full overflow-hidden border-b px-4 py-3 text-left transition-colors duration-200",
+        activo ? "bg-card" : "hover:bg-card/70",
       )}
     >
+      {/* Al pasar: una barra fina que asoma por la izquierda y la foto que se
+          acerca un poco. Dice "esto se abre" sin cambiar nada de lo que se lee. */}
+      {!activo && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-2 left-0 w-0.5 origin-center scale-y-0 rounded-full bg-primary/50 transition-transform duration-200 group-hover:scale-y-100"
+        />
+      )}
       {/* Resplandor de llegada: se enciende y se apaga solo, en unos dos
           segundos. Lo bastante para ver que entro, no tanto que estorbe. */}
       <AnimatePresence>
@@ -218,10 +230,15 @@ function Item({
  */
 function Miniatura({ url }: { url: string | null }) {
   return (
-    <div className="size-12 shrink-0 overflow-hidden rounded-md bg-muted">
+    <div className="size-12 shrink-0 overflow-hidden rounded-md bg-muted ring-1 ring-border transition-shadow duration-200 group-hover:shadow-md">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" loading="lazy" className="size-full object-cover" />
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          className="size-full object-cover transition-transform duration-300 ease-out group-hover:scale-110"
+        />
       ) : (
         <div className="flex size-full items-center justify-center text-muted-foreground/60">
           <ImageOff className="size-4" aria-hidden />

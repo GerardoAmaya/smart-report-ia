@@ -35,7 +35,12 @@ export function EnVivo({ estado }: { estado: EstadoFlujo }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span
+          className={cn(
+            "flex items-center gap-1.5 rounded-full text-xs text-muted-foreground sm:border sm:px-2.5 sm:py-1",
+            estado === "en-vivo" && "sm:border-primary/25 sm:bg-primary/8 sm:text-primary",
+          )}
+        >
           <span className="relative flex size-2">
             <AnimatePresence>
               {estado === "en-vivo" && latido > 0 && !quieto && (

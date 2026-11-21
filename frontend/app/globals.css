@@ -173,6 +173,15 @@
   --radius-md: calc(var(--radius) * 0.875);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.5);
+  --animate-shiny-text: shiny-text 8s infinite;
+  @keyframes shiny-text {
+  0%, 90%, 100% {
+    background-position: calc(-100% - var(--shiny-width)) 0;
+    }
+  30%, 60% {
+    background-position: calc(100% + var(--shiny-width)) 0;
+    }
+  }
 }
 
 @layer base {
@@ -409,4 +418,152 @@
 }
 .maplibregl-popup-anchor-right .maplibregl-popup-tip {
   border-left-color: var(--popover);
+}
+
+/*
+ * --- Identidad: detalles que se notan sin que se vean ---
+ */
+
+/* La seleccion de texto con la paleta, no el azul del sistema. */
+::selection {
+  background: color-mix(in oklab, var(--primary) 26%, transparent);
+  color: var(--foreground);
+}
+
+/* Barras de desplazamiento finas y del color del borde: la cola y el detalle
+   se recorren todo el dia, y la barra gruesa del sistema pesa mas que el
+   contenido. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--foreground) 22%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * Brillo que cruza un boton al pasar el raton. Solo al pasar: un boton que
+ * brilla solo pide atencion todo el rato, y en la entrada ya hay bastante.
+ */
+.boton-brillo {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.boton-brillo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    color-mix(in oklab, var(--atencion) 28%, transparent) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.boton-brillo:hover::after,
+.boton-brillo:focus-visible::after {
+  transform: translateX(120%);
+}
+
+/*
+ * Texto con degradado que se desplaza despacio: solo para la palabra que da
+ * sentido al titular de la entrada. Verde de señalizacion a ambar de cono, la
+ * misma pareja que el resto de la marca.
+ */
+.texto-degradado {
+  background-image: linear-gradient(
+    100deg,
+    var(--primary) 10%,
+    color-mix(in oklab, var(--primary) 55%, var(--atencion)) 45%,
+    var(--atencion) 60%,
+    var(--primary) 90%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: texto-degradado 9s ease-in-out infinite alternate;
+}
+@keyframes texto-degradado {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+/*
+ * El pulso de lo urgente en la cola. Lento —2,4 s, el mismo del mapa— y solo
+ * en el punto de la insignia: en una lista que se mira ocho horas, un latido
+ * rapido cansa, y si latiera todo no diria nada.
+ */
+.pulso-urgente {
+  animation: pulso-urgente 2.4s ease-out infinite;
+}
+@keyframes pulso-urgente {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--urgente) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* Icono de un estado vacio que flota despacio: dice "aqui no hay nada todavia"
+   sin parecer roto. */
+.flotar {
+  animation: flotar 4s ease-in-out infinite;
+}
+@keyframes flotar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Trama de puntos tenue de fondo, en CSS: el componente de puntos de Magic UI
+   pinta un elemento por punto, y para un fondo eso son cientos de nodos. */
+.trama-puntos {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--foreground) 16%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 18px 18px;
+}
+
+/* Bordes que se desvanecen: para la cinta del flujo en la entrada. */
+.desvanecer-bordes {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .texto-degradado,
+  .pulso-urgente,
+  .flotar {
+    animation: none !important;
+  }
+  .boton-brillo::after {
+    transition: none !important;
+  }
 }

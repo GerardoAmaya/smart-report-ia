@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { LineaDespacho } from "./LineaDespacho";
 import {
   Select,
   SelectContent,
@@ -134,6 +135,13 @@ export function Despacho({ caso }: { caso: Detalle }) {
   return (
     <Card className="mt-6">
       <CardContent className="space-y-5 pt-6">
+        {/* --- Donde va el caso: la misma linea que ve quien solo mira --- */}
+        {caso.assigned_at && (
+          <div className="border-b pb-5">
+            <LineaDespacho caso={caso} />
+          </div>
+        )}
+
         {/* --- Cuadrilla --- */}
         {!cerrado && (
           <div>

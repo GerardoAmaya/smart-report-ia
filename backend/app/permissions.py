@@ -30,6 +30,9 @@ class Permission(StrEnum):
     DESPACHAR = "despachar"
     # Borrar de verdad. Va aparte de todo lo demas a proposito.
     BORRAR = "borrar"
+    # Autorizar correos, cambiar roles, desactivar cuentas. Es dar o quitar
+    # acceso a todo lo demas, asi que va solo con administracion.
+    GESTIONAR_USUARIOS = "gestionar_usuarios"
 
 
 # **El usuario de prueba solo mira, salvo que se encienda `demo_can_dispatch`.**
@@ -41,7 +44,9 @@ class Permission(StrEnum):
 # Es un rol aparte de `operator` justo para esto: restringir al invitado sin
 # tocar a los operadores ni migrar nada.
 PERMISOS: dict[Role, frozenset[Permission]] = {
-    Role.ADMIN: frozenset({Permission.VER, Permission.DESPACHAR, Permission.BORRAR}),
+    Role.ADMIN: frozenset(
+        {Permission.VER, Permission.DESPACHAR, Permission.BORRAR, Permission.GESTIONAR_USUARIOS}
+    ),
     Role.OPERATOR: frozenset({Permission.VER, Permission.DESPACHAR}),
     Role.DEMO: frozenset({Permission.VER}),
 }

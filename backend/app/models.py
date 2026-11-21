@@ -453,6 +453,10 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(128))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # La foto: la que la persona subio manda sobre la de Google. Dos columnas y
+    # no una porque quitar la propia tiene que volver a la de Google, no a nada.
+    google_picture_url: Mapped[str | None] = mapped_column(String(500))
+    avatar_key: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

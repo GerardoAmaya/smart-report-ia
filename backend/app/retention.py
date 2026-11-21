@@ -16,6 +16,7 @@ imagen.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -24,9 +25,13 @@ from sqlalchemy.orm import Session
 
 from app import logging_setup, storage
 from app.config import settings
-from app.models import Case, CasePhoto, Report, ReportPhoto
+from app.models import Case, CasePhoto, Report, ReportPhoto, User
 
 log = logging.getLogger("smart_report.retention")
+
+# La forma de la clave de una foto (ver `storage.build_key`). Lo demas del bucket
+# —respaldos, avatares— no es asunto del barrido de huerfanos.
+CLAVE_DE_FOTO = re.compile(r"^\d{4}/\d{2}/\d{2}/")
 
 
 @dataclass(frozen=True)
@@ -186,6 +191,8 @@ def orphans(session: Session, limite: int = 1000) -> list[str]:
         ReportPhoto.thumbnail_key,
         CasePhoto.storage_key,
         CasePhoto.thumbnail_key,
+        # Las fotos de perfil tienen fila en `users`: no son huerfanas.
+        User.avatar_key,
     ):
         referenciadas.update(k for k in session.execute(select(columna)).scalars().all() if k)
 
@@ -201,6 +208,13 @@ def orphans(session: Session, limite: int = 1000) -> list[str]:
 
         for objeto in respuesta.get("Contents", []):
             clave = objeto["Key"]
+            # **Solo fotos de reporte y de arreglo**, por la forma de su clave
+            # (AAAA/MM/DD/...). El bucket guarda tambien los respaldos de la base
+            # y los avatares, que no apunta ninguna fila de fotos: sin este
+            # filtro el barrido borraba cada respaldo a las 24 horas, y la
+            # ventana de catorce dias quedaba en uno sin que nadie lo notara.
+            if not CLAVE_DE_FOTO.match(clave):
+                continue
             if clave in referenciadas:
                 continue
             if objeto["LastModified"] > corte:

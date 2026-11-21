@@ -112,6 +112,26 @@ def para_comparar(data: bytes) -> bytes:
         return salida.getvalue()
 
 
+# El avatar se ve a 24-40 px en el tablero; 256 cubre pantallas de alta densidad
+# sin guardar el original, que puede llevar la cara de alguien mas al fondo.
+AVATAR_LADO = 256
+
+
+def avatar(data: bytes) -> bytes:
+    """La foto de perfil: recortada al centro en cuadrado y a 256 px, en JPEG.
+
+    Recortada y no deformada: una cara estirada a lo ancho se reconoce peor que
+    una cortada por los lados.
+    """
+    with Image.open(io.BytesIO(data)) as img:
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+        img = ImageOps.fit(img, (AVATAR_LADO, AVATAR_LADO), Image.LANCZOS, centering=(0.5, 0.5))
+        salida = io.BytesIO()
+        img.save(salida, format="JPEG", quality=85, optimize=True)
+        return salida.getvalue()
+
+
 def thumbnail(data: bytes) -> bytes:
     """Miniatura para la cola del tablero.
 

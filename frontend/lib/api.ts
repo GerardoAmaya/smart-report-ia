@@ -61,8 +61,24 @@ export const PerfilSchema = z.object({
   role: z.enum(["admin", "operator", "demo"]),
   display_name: z.string().nullable(),
   permissions: z.array(z.string()),
+  // Opcionales ademas de nulas: una API anterior sin estos campos no rompe la
+  // sesion, solo se queda sin foto.
+  avatar_url: z.string().nullable().optional(),
+  avatar_propio: z.boolean().optional(),
+  last_login_at: z.string().nullable().optional(),
 });
 export type Perfil = z.infer<typeof PerfilSchema>;
+
+export const UsuarioSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  display_name: z.string().nullable(),
+  role: z.enum(["admin", "operator"]),
+  is_active: z.boolean(),
+  last_login_at: z.string().nullable(),
+  avatar_url: z.string().nullable(),
+});
+export type Usuario = z.infer<typeof UsuarioSchema>;
 
 export const CasoSchema = z.object({
   id: z.string(),
@@ -202,6 +218,31 @@ export const api = {
     }),
 
   salir: () => pedir("/auth/salir", z.object({ ok: z.boolean() }), { method: "POST" }),
+
+  cambiarNombre: (display_name: string) =>
+    pedir("/auth/yo", PerfilSchema, { method: "PATCH", body: JSON.stringify({ display_name }) }),
+
+  subirFoto: (archivo: File) => {
+    const cuerpo = new FormData();
+    cuerpo.append("archivo", archivo);
+    return pedir("/auth/yo/foto", PerfilSchema, { method: "POST", body: cuerpo });
+  },
+
+  quitarFoto: () => pedir("/auth/yo/foto", PerfilSchema, { method: "DELETE" }),
+
+  usuarios: () => pedir("/board/usuarios", z.object({ usuarios: z.array(UsuarioSchema) })),
+
+  autorizarUsuario: (email: string, role: Usuario["role"]) =>
+    pedir("/board/usuarios", UsuarioSchema, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+
+  cambiarUsuario: (id: string, cambios: { role?: Usuario["role"]; is_active?: boolean }) =>
+    pedir(`/board/usuarios/${id}`, UsuarioSchema, {
+      method: "PATCH",
+      body: JSON.stringify(cambios),
+    }),
 
   casos: (filtros?: { status?: string; category?: string }) => {
     const q = new URLSearchParams();

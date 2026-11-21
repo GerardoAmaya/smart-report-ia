@@ -26,7 +26,7 @@ export function CambiarTema() {
           variant="ghost"
           size="icon"
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-          aria-label="Cambiar entre tema claro y oscuro"
+          aria-label="Cambiar tema"
         >
           <Moon className="size-4 dark:hidden" />
           <Sun className="hidden size-4 dark:block" />

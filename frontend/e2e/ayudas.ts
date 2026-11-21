@@ -49,11 +49,20 @@ const LON0 = -89.2182;
  * afirmaciones sobre "cuantos hay en el caso" se vuelven imposibles de escribir.
  * Un kilometro de separacion basta: el umbral de duda son ochenta metros.
  */
-const CORRIDA_KM = Math.floor(Math.random() * 400) + 20;
+//
+// En dos ejes y no en uno: con 400 sitios en linea, tras unas veinte corridas
+// sobre la misma base dos caian en el mismo kilometro (un 6 % por corrida), sus
+// reportes se juntaban y la prueba de agrupacion encontraba tres casos donde
+// esperaba uno. Con 400 x 400 la probabilidad baja a una entre miles.
+const CORRIDA_KM_NORTE = Math.floor(Math.random() * 400) + 20;
+const CORRIDA_KM_ESTE = Math.floor(Math.random() * 400) + 20;
 
 /** Coordenadas desplazadas por metros medidos, no por grados inventados. */
 export function desplazar(metros: number): { lat: number; lon: number } {
-  return { lat: LAT0 + (metros + CORRIDA_KM * 1000) / 111_320, lon: LON0 };
+  const lat = LAT0 + (metros + CORRIDA_KM_NORTE * 1000) / 111_320;
+  // Un grado de longitud mide menos lejos del ecuador: se corrige por la latitud.
+  const lon = LON0 + (CORRIDA_KM_ESTE * 1000) / (111_320 * Math.cos((lat * Math.PI) / 180));
+  return { lat, lon };
 }
 
 async function alWebhook(api: APIRequestContext, payload: unknown) {

@@ -128,7 +128,13 @@ export function BotonAsistente({
           <span className="hidden lg:inline">Asistente</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+      <SheetContent
+        side="right"
+        // Con el prefijo data-[side=right]: el Sheet trae w-3/4 y sm:max-w-sm con
+        // ese prefijo, que le ganan a un w-full sin el, y en el celular el panel
+        // ocupaba tres cuartos de pantalla.
+        className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+      >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" />

@@ -1,18 +1,19 @@
 "use client";
 
 /**
- * Quien esta dentro, y lo que se hace con la sesion: tema y salir.
+ * Quién está dentro, y lo que se hace con la cuenta: perfil, usuarios y salir.
  *
- * Juntos en un menu y no sueltos en el encabezado: son cosas que se tocan una
- * vez al dia, y sueltas le quitaban sitio a lo que se usa todo el rato.
+ * El tema ya no vive aquí: va suelto en la barra, porque se cambia más de lo
+ * que se pensaba —al pasar de la oficina a la calle— y escondido en un menú
+ * nadie lo encontraba.
  *
  * Dice el rol en palabras. Un invitado que no sabe que solo mira se topa con
- * botones que no estan y cree que el tablero esta roto.
+ * botones que no están y cree que el tablero está roto.
  */
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { LogOut, UserRound, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,25 +26,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api, type Perfil } from "@/lib/api";
 
-/** El rol en palabras, sacado de los permisos reales y no del nombre del rol:
- *  el invitado solo mira en produccion pero despacha en local y en las pruebas. */
-function rol(perfil: Perfil): string {
-  if (perfil.role === "admin") return "Administración";
-  if (perfil.role === "operator") return "Despacho";
-  return perfil.permissions.includes("despachar") ? "Invitado" : "Invitado · solo mira";
-}
-
-function iniciales(perfil: Perfil): string {
-  const base = perfil.display_name ?? perfil.email;
-  const partes = base.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
-  return (partes[0]?.[0] ?? "?").concat(partes[1]?.[0] ?? "").toUpperCase();
-}
+import { Avatar } from "./Avatar";
+import { nombreDelRol, PerfilPanel } from "./PerfilPanel";
+import { UsuariosPanel } from "./UsuariosPanel";
 
 export function MenuUsuario({ perfil }: { perfil: Perfil }) {
   const router = useRouter();
   const cliente = useQueryClient();
-  const { resolvedTheme, setTheme } = useTheme();
-  const oscuro = resolvedTheme === "dark";
+  const [verPerfil, setVerPerfil] = useState(false);
+  const [verUsuarios, setVerUsuarios] = useState(false);
+  const gestiona = perfil.permissions.includes("gestionar_usuarios");
 
   async function salir() {
     await api.salir();
@@ -54,36 +46,58 @@ export function MenuUsuario({ perfil }: { perfil: Perfil }) {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 gap-2 px-1.5" aria-label="Menú de usuario">
-          <span
-            aria-hidden
-            className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground"
-          >
-            {iniciales(perfil)}
-          </span>
-          <span className="hidden max-w-40 truncate text-xs text-muted-foreground md:inline">
-            {perfil.display_name ?? perfil.email}
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel className="font-normal">
-          <p className="truncate text-sm font-medium">{perfil.display_name ?? perfil.email}</p>
-          <p className="truncate text-xs text-muted-foreground">{rol(perfil)}</p>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => setTheme(oscuro ? "light" : "dark")}>
-          {oscuro ? <Sun /> : <Moon />}
-          {oscuro ? "Tema claro" : "Tema oscuro"}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={salir}>
-          <LogOut />
-          Salir
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {/* modal={false}: con el menu modal, abrir un panel desde una de sus
+          opciones dejaba la pagina sin poder hacer clic al cerrarlo. */}
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 gap-2 px-1.5" aria-label="Menú de usuario">
+            <Avatar url={perfil.avatar_url} nombre={perfil.display_name} email={perfil.email} />
+            <span className="hidden max-w-40 truncate text-xs text-muted-foreground md:inline">
+              {perfil.display_name ?? perfil.email}
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuLabel className="flex items-center gap-3 font-normal">
+            <Avatar
+              url={perfil.avatar_url}
+              nombre={perfil.display_name}
+              email={perfil.email}
+              className="size-9 text-xs"
+            />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">
+                {perfil.display_name ?? perfil.email}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {nombreDelRol(perfil)}
+              </span>
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setVerPerfil(true)}>
+            <UserRound />
+            Mi perfil
+          </DropdownMenuItem>
+          {gestiona && (
+            <DropdownMenuItem onSelect={() => setVerUsuarios(true)}>
+              <UsersRound />
+              Usuarios
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={salir}>
+            <LogOut />
+            Salir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <PerfilPanel perfil={perfil} abierto={verPerfil} onAbierto={setVerPerfil} />
+      {gestiona && (
+        <UsuariosPanel abierto={verUsuarios} onAbierto={setVerUsuarios} miEmail={perfil.email} />
+      )}
+    </>
   );
 }

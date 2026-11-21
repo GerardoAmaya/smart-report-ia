@@ -17,6 +17,7 @@ from app.routes_asistente import router as asistente_router
 from app.routes_auth import router as auth_router
 from app.routes_board import router as board_router
 from app.routes_public import router as public_router
+from app.routes_usuarios import router as usuarios_router
 from app.security import BodySizeLimitMiddleware, SecurityHeadersMiddleware, body_was_truncated
 from app.stream import router as stream_router
 from app.webhook import router as webhook_router
@@ -82,6 +83,7 @@ app.include_router(board_router)
 app.include_router(actividad_router)
 app.include_router(asistente_router)
 app.include_router(public_router)
+app.include_router(usuarios_router)
 app.include_router(stream_router)
 
 

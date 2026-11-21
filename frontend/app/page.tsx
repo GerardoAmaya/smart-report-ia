@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSesion } from "@/lib/sesion";
 import { BotonAsistente } from "@/componentes/Asistente";
 import { Buscador } from "@/componentes/Buscador";
+import { CambiarTema } from "@/componentes/CambiarTema";
 import { Cola } from "@/componentes/Cola";
 import { Detalle } from "@/componentes/Detalle";
 import { Fallo } from "@/componentes/Estados";
@@ -163,6 +164,9 @@ function Tablero() {
             }}
           />
           <BotonAsistente alElegirCaso={elegir} />
+          {/* Suelto en la barra y no en el menu: se cambia al pasar de la
+              oficina a la calle, y escondido no lo encontraba nadie. */}
+          <CambiarTema />
           <MenuUsuario perfil={perfil} />
         </div>
       </header>

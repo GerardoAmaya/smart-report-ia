@@ -213,6 +213,12 @@ $C logs -f api worker          # qué está pasando
 git pull && $C up -d --build   # actualizar
 ```
 
+**Si cambió el `Caddyfile`, reiniciar Caddy, no recargarlo:**
+`$C restart caddy`. El archivo se monta suelto en el contenedor, y tanto
+`git pull` como `rsync` lo reemplazan por uno nuevo: el contenedor sigue viendo
+el viejo, y `caddy reload` relee el viejo sin quejarse. Pasó al agregar
+`/public`: la ruta respondía con la página 404 del tablero.
+
 Conviene un monitor externo gratuito —UptimeRobot o Healthchecks.io— que pida
 `/health` cada cinco minutos y avise por correo. Si Oracle recupera la máquina
 de madrugada, es la diferencia entre enterarse por el correo o por la gente.

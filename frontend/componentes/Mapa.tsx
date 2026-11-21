@@ -43,6 +43,7 @@ import {
   sinMovimiento,
 } from "@/componentes/MapaAnimaciones";
 import { api, type Punto } from "@/lib/api";
+import { colorEdificio3D, teñirMapa } from "@/lib/colorMapa";
 import {
   columnas,
   encuadre,
@@ -213,6 +214,8 @@ export function Mapa({
     // Cambiar el estilo (al pasar de tema) borra las capas propias: se
     // vuelven a poner al terminar de cargar el nuevo.
     m.on("style.load", () => {
+      // El color va en los dos modos y en cada estilo: setStyle lo reemplaza.
+      teñirMapa(m, actual.current.oscuro);
       if (actual.current.modo !== "3d") return;
       ponerCapas3D(m, actual.current.puntos, actual.current.oscuro);
       // Un tema nuevo no es un dato nuevo: las columnas vuelven enteras.
@@ -574,7 +577,7 @@ function ponerCapas3D(m: MapLibreMap, puntos: Punto[], oscuro: boolean) {
         "source-layer": "building",
         minzoom: 13,
         paint: {
-          "fill-extrusion-color": oscuro ? "#2b3035" : "#dcded9",
+          "fill-extrusion-color": colorEdificio3D(oscuro),
           "fill-extrusion-height": ["coalesce", ["get", "render_height"], 0],
           "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
           // Recesivos: estan para orientarse, no para competir con los casos.

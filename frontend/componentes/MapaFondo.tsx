@@ -16,6 +16,8 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { useEffect, useRef } from "react";
 
+import { teñirMapa } from "@/lib/colorMapa";
+
 const ESTILO_CLARO = "https://tiles.openfreemap.org/styles/positron";
 const ESTILO_OSCURO = "https://tiles.openfreemap.org/styles/dark";
 
@@ -51,6 +53,8 @@ export function MapaFondo({ oscuro }: { oscuro: boolean }) {
         attributionControl: { compact: true },
       });
       mapa.current = m;
+      // Con color tambien en la entrada; se repite en cada cambio de tema.
+      m.on("style.load", () => teñirMapa(m, estilo.current === ESTILO_OSCURO));
 
       if (quieto) return;
       let parada = 0;

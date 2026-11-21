@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from app import auth
 from app.config import settings
 from app.main import app
-from app.models import Case, Report, User
+from app.models import Case, Crew, Report, User
 from app.permissions import Permission, Role, puede
 
 # Con ñ a proposito: `compare_digest` sobre cadenas solo admite ASCII y
@@ -112,8 +112,11 @@ def test_el_usuario_de_prueba_no_puede_borrar(client, session, caso):
 
 def test_con_el_interruptor_el_invitado_despacha(client, session, caso, invitado_despacha):
     entrar_de_prueba(client)
+    cuadrilla = Crew(name="Cuadrilla de prueba", is_active=True)
+    session.add(cuadrilla)
+    session.commit()
 
-    r = client.post(f"/board/cases/{caso.id}/status?nuevo=assigned")
+    r = client.post(f"/board/cases/{caso.id}/assign?crew_id={cuadrilla.id}")
 
     assert r.status_code == 200
     session.refresh(caso)
@@ -144,7 +147,7 @@ def test_por_defecto_el_invitado_solo_mira(client, session, caso):
     assert client.get("/auth/yo").json()["permissions"] == ["ver"]
 
     reporte = session.execute(select(Report).where(Report.case_id == caso.id)).scalar_one()
-    assert client.post(f"/board/cases/{caso.id}/status?nuevo=assigned").status_code == 403
+    assert client.post(f"/board/cases/{caso.id}/assign?crew_id={uuid.uuid4()}").status_code == 403
     assert client.post(f"/board/reports/{reporte.id}/ungroup").status_code == 403
     # Y nada cambio: no basta con que devuelva 403.
     session.refresh(caso)
@@ -178,7 +181,7 @@ def test_sin_sesion_no_se_lee_el_tablero(client):
 
 
 def test_sin_sesion_no_se_cambia_nada(client, caso):
-    assert client.post(f"/board/cases/{caso.id}/status?nuevo=closed").status_code == 401
+    assert client.post(f"/board/cases/{caso.id}/close").status_code == 401
     assert client.delete(f"/board/cases/{caso.id}").status_code == 401
 
 

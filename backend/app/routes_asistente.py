@@ -34,9 +34,9 @@ UN_DIA = 24 * 60 * 60
 def gastar_consulta(session, usuario: User) -> int:
     """Cuenta una consulta y corta si se paso del tope del dia.
 
-    El dia es la ventana fija en UTC: se reinicia a las seis de la tarde en El
-    Salvador. Se cuenta antes de llamar al modelo, porque lo caro es la
-    llamada, no la respuesta.
+    El dia es el de El Salvador: se reinicia a medianoche de alli. En UTC se
+    reiniciaba a las seis de la tarde, a mitad de la jornada. Se cuenta antes
+    de llamar al modelo, porque lo caro es la llamada, no la respuesta.
     """
     limite = (
         settings.assistant_daily_limit_demo
@@ -49,13 +49,14 @@ def gastar_consulta(session, usuario: User) -> int:
         key=rate_limit_key(f"asistente:{usuario.email}"),
         limit=limite,
         window_seconds=UN_DIA,
+        zona=asistente.ZONA,
     )
     session.commit()
     if not resultado.allowed:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             f"Llegaste al tope de {limite} consultas al asistente por hoy. "
-            "Vuelve a intentarlo más tarde.",
+            "Se renueva a la medianoche.",
             headers={"Retry-After": str(resultado.retry_after_seconds)},
         )
     return limite - resultado.count

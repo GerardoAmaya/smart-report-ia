@@ -617,8 +617,11 @@ def test_no_se_cierra_asignado_aunque_haya_foto(sesion, session, cuadrilla):
     caso = caso_con_reportes(session, ["1801"])
     en_curso(sesion, caso.id, cuadrilla)
     subir_evidencia(sesion, caso.id)
-    # Vuelve a asignado con la foto ya puesta.
-    assert sesion.post(f"/board/cases/{caso.id}/status?nuevo=assigned").status_code == 200
+    # Vuelve a asignado con la foto ya puesta. Directo en la base: la API ya no
+    # tiene forma de retroceder un estado a mano, y lo que se prueba aqui es que
+    # cerrar mire el estado, no como se llego a el.
+    caso.status = "assigned"
+    session.commit()
 
     r = sesion.post(f"/board/cases/{caso.id}/close")
 
@@ -632,16 +635,25 @@ def test_no_se_cierra_asignado_aunque_haya_foto(sesion, session, cuadrilla):
     assert cierres == 0
 
 
-def test_no_se_cierra_por_el_cambio_de_estado(sesion, session):
-    """La puerta lateral: cerraba sin foto, sin `closed_at` y sin avisar."""
+@pytest.mark.parametrize("nuevo", ["assigned", "in_progress", "closed", "open"])
+def test_no_hay_cambio_de_estado_a_mano(sesion, session, nuevo):
+    """La puerta lateral `/status`: ponia asignado o en curso sin cuadrilla, sin
+    `assigned_at` y sin avisar, y antes cerraba sin foto. Cada paso tiene su
+    accion, y ninguna otra via cambia el estado."""
     caso = caso_con_reportes(session, ["1901"])
 
-    r = sesion.post(f"/board/cases/{caso.id}/status?nuevo=closed")
+    r = sesion.post(f"/board/cases/{caso.id}/status?nuevo={nuevo}")
 
-    assert r.status_code == 409
+    assert r.status_code == 404
     session.refresh(caso)
     assert caso.status == "open"
+    assert caso.crew_id is None
+    assert caso.assigned_at is None
     assert caso.closed_at is None
+    avisos = session.execute(
+        select(func.count(Notification.id)).where(Notification.case_id == caso.id)
+    ).scalar_one()
+    assert avisos == 0
 
 
 def test_el_camino_completo_avisa_en_orden(sesion, session, cuadrilla):

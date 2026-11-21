@@ -238,12 +238,11 @@ def test_un_caso_que_no_existe_da_404(sesion_iniciada):
 
 
 def test_no_se_puede_descartar_cambiando_el_estado(sesion_iniciada, session):
-    """`discarded` no esta entre los estados que despachar puede poner.
-
-    Descartar es borrar, y borrar es otro permiso.
-    """
+    """No hay cambio de estado a mano: descartar es borrar, y borrar es otro permiso."""
     crear_reporte(session)
     caso_id = sesion_iniciada.get("/board/cases").json()["cases"][0]["id"]
 
     r = sesion_iniciada.post(f"/board/cases/{caso_id}/status?nuevo=discarded")
-    assert r.status_code == 422
+    assert r.status_code == 404
+    caso = sesion_iniciada.get(f"/board/cases/{caso_id}").json()
+    assert caso["status"] == "open"

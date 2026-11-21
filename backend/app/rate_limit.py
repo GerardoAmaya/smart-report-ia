@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -60,10 +60,21 @@ def ahora() -> datetime:
     return datetime.now(UTC)
 
 
-def window_start(now: datetime, window_seconds: int) -> datetime:
-    """Inicio de la ventana fija que contiene a `now`."""
-    epoch = int(now.timestamp())
-    return datetime.fromtimestamp(epoch - (epoch % window_seconds), tz=UTC)
+def window_start(now: datetime, window_seconds: int, zona: tzinfo | None = None) -> datetime:
+    """Inicio de la ventana fija que contiene a `now`.
+
+    Sin zona, las ventanas se alinean al reloj UTC: para las de un minuto o una
+    hora da igual. Con zona, se alinean al reloj de alli: un tope "por dia" que
+    empezaba a medianoche UTC se reiniciaba a las seis de la tarde en El
+    Salvador, a mitad de la jornada de quien despacha.
+    """
+    if zona is None:
+        epoch = int(now.timestamp())
+        return datetime.fromtimestamp(epoch - (epoch % window_seconds), tz=UTC)
+    # Se corre el reloj al de la zona, se redondea alli y se vuelve a UTC.
+    desfase = now.astimezone(zona).utcoffset() or timedelta(0)
+    local = int((now + desfase).timestamp())
+    return datetime.fromtimestamp(local - (local % window_seconds), tz=UTC) - desfase
 
 
 def hit(
@@ -74,14 +85,16 @@ def hit(
     limit: int,
     window_seconds: int,
     now: datetime | None = None,
+    zona: tzinfo | None = None,
 ) -> RateLimitResult:
     """Cuenta una peticion y dice si pasa.
 
     Cuenta siempre, incluso cuando ya se paso: asi el que insiste sigue viendo
     la puerta cerrada durante toda la ventana en vez de colar una por ciclo.
+    `zona` alinea la ventana al reloj local (ver `window_start`).
     """
     now = now or ahora()
-    inicio = window_start(now, window_seconds)
+    inicio = window_start(now, window_seconds, zona)
 
     count = session.execute(_HIT, {"scope": scope, "key": key, "window_start": inicio}).scalar_one()
 

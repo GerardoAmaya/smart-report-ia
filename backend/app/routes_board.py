@@ -20,7 +20,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy import case, cast, func, select, text
 from sqlalchemy.orm import Session as OrmSession
 
-from app import dispatch, grouping, images, storage
+from app import dispatch, grouping, images, paginacion, storage
 from app.auth import requiere
 from app.config import settings
 from app.db import SesionBD
@@ -73,8 +73,14 @@ def listar_casos(
     status_: str | None = Query(None, alias="status"),
     category: str | None = None,
     limite: int = Query(50, ge=1, le=200),
+    cursor: str | None = None,
 ) -> dict:
-    """La cola. Lo mas urgente y lo mas reportado primero."""
+    """La cola. Lo mas urgente y lo mas reportado primero, por paginas.
+
+    Devuelve `next_cursor` para pedir la siguiente (null en la ultima) y `total`
+    con los mismos filtros. Antes devolvia solo los 50 primeros: un caso nuevo,
+    leve y de un reporte caia al final y con mas de 50 no se veia nunca.
+    """
     condiciones = []
     if status_:
         condiciones.append(Case.status == status_)
@@ -111,7 +117,14 @@ def listar_casos(
         .scalar_subquery()
     )
 
-    filas = session.execute(
+    # El orden, todo ascendente para que el cursor sea una sola comparacion de
+    # filas: los reportes van negados (mas reportes, antes) y el id desempata
+    # al final. Sin ese desempate dos casos iguales en todo lo demas podrian
+    # salir en cualquier orden, y el cursor saltaria uno de ellos.
+    menos_reportes = -func.count(Report.id)
+    orden = [orden_severidad, menos_reportes, Case.created_at, Case.id]
+
+    consulta = (
         select(
             Case,
             func.count(func.distinct(Report.id)).label("reportes"),
@@ -120,15 +133,34 @@ def listar_casos(
             .label("dudosos"),
             direccion.label("direccion"),
             miniatura.label("miniatura"),
+            orden_severidad.label("rango"),
+            menos_reportes.label("menos_reportes"),
         )
         .outerjoin(Report, Report.case_id == Case.id)
         .where(*condiciones)
         .group_by(Case.id)
-        .order_by(orden_severidad, func.count(Report.id).desc(), Case.created_at)
-        .limit(limite)
-    ).all()
+        .order_by(*orden)
+        # Una de mas: si llega, hay pagina siguiente, sin otra consulta.
+        .limit(limite + 1)
+    )
+    if cursor:
+        # En HAVING y no en WHERE: el orden usa el conteo de reportes, que solo
+        # existe despues de agrupar.
+        consulta = consulta.having(paginacion.despues_de(orden, cursor))
+    filas = session.execute(consulta).all()
+
+    hay_mas = len(filas) > limite
+    filas = filas[:limite]
+    siguiente = None
+    if hay_mas:
+        ultimo, *_, rango, menos = filas[-1]
+        siguiente = paginacion.codificar(rango, menos, ultimo.created_at, ultimo.id)
+
+    total = session.execute(select(func.count(Case.id)).where(*condiciones)).scalar_one()
 
     return {
+        "next_cursor": siguiente,
+        "total": total,
         "cases": [
             {
                 "id": str(caso.id),
@@ -144,8 +176,8 @@ def listar_casos(
                 "address": direccion,
                 "thumbnail_url": _url_de_foto(miniatura),
             }
-            for caso, reportes, dudosos, direccion, miniatura in filas
-        ]
+            for caso, reportes, dudosos, direccion, miniatura, _, _ in filas
+        ],
     }
 
 
@@ -283,6 +315,9 @@ def detalle_del_caso(
                         # Se dice si la persona corrigio al modelo: eso es lo
                         # que deja ver donde el modelo se equivoca.
                         "corrected": clasificacion.status == "corrected",
+                        # Y si eligio sin propuesta: el modelo fallo y no hubo
+                        # nada que corregir. Decir "corrigio" ahi era falso.
+                        "chosen": clasificacion.status == "chosen",
                     }
                     if clasificacion
                     else None
@@ -383,30 +418,11 @@ def separar_del_caso(
     return {"ok": True, "case_id": str(reporte.case_id) if reporte.case_id else None}
 
 
-@router.post("/cases/{case_id}/status")
-def cambiar_estado(
-    case_id: UUID,
-    usuario: Despachar,
-    nuevo: Annotated[str, Query(pattern="^(open|assigned|in_progress|closed)$")],
-    session: SesionBD,
-) -> dict:
-    """Cambia el estado del caso. `discarded` no esta: eso es borrar."""
-    caso = session.get(Case, case_id)
-    if caso is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no existe ese caso")
-
-    # Cerrar por aqui era una puerta lateral: sin foto, sin `closed_at` —de la
-    # que cuelga la retencion— y sin avisar a nadie. Cerrar tiene su accion,
-    # que exige el caso en curso y la foto del arreglo.
-    if nuevo == "closed":
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "Para cerrar hace falta la foto del arreglo: usa la acción de cerrar.",
-        )
-
-    caso.status = nuevo
-    session.commit()
-    return {"ok": True, "status": caso.status}
+# No hay un "cambiar estado" a mano, a proposito. Lo hubo (`/status`) y era una
+# puerta lateral: dejaba poner un caso en asignado o en curso sin cuadrilla, sin
+# `assigned_at` y sin avisar a quien reporto, y antes dejaba cerrarlo sin foto.
+# Cada paso tiene su accion, que es la que garantiza lo que ese estado promete:
+# /assign, /start, /close y /reopen. El tablero no lo usaba.
 
 
 @router.delete("/cases/{case_id}")

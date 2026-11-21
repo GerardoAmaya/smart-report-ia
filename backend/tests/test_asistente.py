@@ -290,6 +290,55 @@ def test_el_barrido_de_otro_ambito_no_borra_el_tope_del_dia(session, monkeypatch
     assert quedan == 1
 
 
+# El dia del tope es el de El Salvador (UTC-6). Con la ventana en UTC se
+# reiniciaba a las seis de la tarde, a mitad de la jornada de quien despacha.
+_OPERADOR = SimpleNamespace(role="operator", email="operadora@ejemplo.sv")
+
+
+def _gastar_a_las(monkeypatch, session, cuando: datetime) -> int:
+    from app import routes_asistente
+
+    monkeypatch.setattr(rate_limit, "ahora", lambda: cuando)
+    return routes_asistente.gastar_consulta(session, _OPERADOR)
+
+
+def test_el_tope_no_se_reinicia_a_medianoche_utc(session, monkeypatch):
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "assistant_daily_limit", 2)
+    # 17:59 en El Salvador.
+    tarde = datetime(2026, 3, 10, 23, 59, tzinfo=UTC)
+    _gastar_a_las(monkeypatch, session, tarde)
+    _gastar_a_las(monkeypatch, session, tarde)
+
+    # 18:01 en El Salvador, ya del dia siguiente en UTC: sigue siendo hoy.
+    with pytest.raises(HTTPException) as cortado:
+        _gastar_a_las(monkeypatch, session, tarde + timedelta(minutes=2))
+    assert cortado.value.status_code == 429
+    # Y avisa cuanto falta de verdad: hasta la medianoche local, casi seis horas.
+    espera = int(cortado.value.headers["Retry-After"])
+    assert 5 * 3600 < espera <= 6 * 3600
+
+
+def test_el_tope_se_reinicia_a_medianoche_en_el_salvador(session, monkeypatch):
+    monkeypatch.setattr(settings, "assistant_daily_limit", 2)
+    # 18:30 del dia 10 en El Salvador, ya dia 11 en UTC.
+    noche = datetime(2026, 3, 11, 0, 30, tzinfo=UTC)
+    _gastar_a_las(monkeypatch, session, noche)
+    _gastar_a_las(monkeypatch, session, noche)
+
+    # 00:00 del dia 11 en El Salvador son las 06:00 UTC: el mismo dia UTC que
+    # el gasto de antes, asi que con la ventana en UTC seguiria cortado.
+    medianoche_local = datetime(2026, 3, 11, 6, 0, tzinfo=UTC)
+    assert _gastar_a_las(monkeypatch, session, medianoche_local) == 1
+
+
+def test_las_ventanas_de_un_minuto_no_cambian():
+    """La zona solo se usa en el tope del dia: el resto sigue alineado a UTC."""
+    momento = datetime(2026, 3, 10, 23, 59, 42, tzinfo=UTC)
+    assert rate_limit.window_start(momento, 60) == datetime(2026, 3, 10, 23, 59, tzinfo=UTC)
+
+
 # --- Solo lectura ---
 
 

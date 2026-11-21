@@ -55,7 +55,7 @@ que existe:
 - Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
 - Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
 - Veinte migraciones, una por tabla, y seeders versionados aparte
-- 275 pruebas y 9 recorridos en verde, CI en verde
+- 312 pruebas y 9 recorridos en verde, CI en verde
 
 **La fase 6 se cerró el 15 de septiembre de 2026.** Un reporte real desde un
 teléfono recorrió todo —foto, ubicación, propuesta, confirmación, asignación,
@@ -282,6 +282,13 @@ apunta» y los registros de desarrollo no están en la base de pruebas.
 bytes y después confirma la fila; sin margen, barrer durante esa ventana
 borraría una foto que estaba entrando. Sin este barrido, un objeto que perdió su
 fila queda fuera del alcance de la política para siempre.
+
+**Y solo barre lo que tiene forma de foto** (`AAAA/MM/DD/...`). Barria todo lo
+que ninguna fila de fotos apuntara, y en el bucket tambien viven los respaldos
+(`respaldos/`) y los avatares (`avatares/`): cada dia se habria llevado el
+respaldo de la vispera, dejando uno de catorce. Se detecto en produccion con dos
+respaldos de menos de un dia, antes de perder ninguno. Cualquier prefijo nuevo
+en el bucket queda fuera del barrido por defecto, que es el lado seguro.
 
 **El aviso de vuelta se encola, nunca se manda en la peticion.** El cierre es
 un hecho; avisarlo es un intento. Si mandar cuatro mensajes viviera dentro de la
@@ -624,6 +631,35 @@ muestra nada de quien reporto: ni su usuario ni lo que escribio.
 **Un enlace con `?caso=` abre en el caso**, no en el resumen. El caso va en la
 URL para poder compartirlo, y abrirlo en el resumen obligaba a buscarlo otra
 vez.
+
+**Quien entra lo gestiona un administrador desde el tablero**, no el seeder. La
+autorizacion sigue siendo la tabla de correos con su rol; ahora se edita con
+`GESTIONAR_USUARIOS`. Nadie se quita a si mismo el rol ni el acceso, y siempre
+queda al menos un admin activo, contado con las filas bloqueadas: dos admins
+desactivandose a la vez podian dejar cero. Desactivar corta en la siguiente
+peticion, porque la sesion mira `is_active` cada vez.
+
+**La foto de perfil: la propia, si no la de Google, si no las iniciales.** La
+propia se recorta a 256 px y vive en R2 bajo `avatares/`. El invitado no
+cambia ni foto ni nombre: es una cuenta de todo el publico, y seria grafiti.
+
+**El asistente lo abre un robot, el unico control con nombre «Asistente».** Es
+un dibujo propio en SVG con la paleta y un casco de obra, no un personaje
+prestado. Se arrastra y recuerda donde lo dejaste; un movimiento de mas de 5 px
+es arrastre y no abre el panel. Su globo da el numero real de urgentes sacado de
+la cache de la cola, sin pedir nada al servidor. Quieto con «reducir
+movimiento».
+
+**Librerias de interfaz: del ecosistema de shadcn, no MUI ni Mantine.** MUI y
+Mantine traen su propio sistema de temas y de estilos; junto a Tailwind y
+shadcn serian dos modos oscuros, estilos que se pisan, unos 300 KB mas y un
+tablero con dos caras. Magic UI y similares se copian al proyecto, heredan la
+paleta y solo usan `motion`, que ya estaba.
+
+**La entrada se entiende en dos segundos.** Tuvo un titular que sonaba bien y no
+decia que era esto («Lo que ves en la calle, atendido»), una palabra que rotaba
+y una cinta de seis pasos: se movia mucho y explicaba poco. Ahora dice que es,
+como funciona en una frase y tres pasos quietos.
 
 ---
 

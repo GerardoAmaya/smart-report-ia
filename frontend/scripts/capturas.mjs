@@ -116,6 +116,30 @@ try {
     await pagina.getByRole("button", { name: /^2d$/i }).click();
   }
 
+  if (toca("robot")) {
+    // De cerca y con el raton encima: en una captura de pagina entera el robot
+    // es un punto en la esquina, y lo que lo hace simpatico es la cara.
+    await pagina.getByRole("tab", { name: "Resumen", exact: true }).click();
+    const robot = pagina.getByRole("button", { name: "Asistente" });
+    await robot.hover();
+    await pagina.waitForTimeout(900);
+    const caja = await robot.boundingBox();
+    if (caja) {
+      const lado = 260;
+      await pagina.screenshot({
+        path: `${DESTINO}/robot.png`,
+        clip: {
+          x: Math.max(0, caja.x + caja.width / 2 - lado / 2),
+          y: Math.max(0, caja.y + caja.height / 2 - lado / 2 - 20),
+          width: lado,
+          height: lado,
+        },
+      });
+      console.log(`  ${DESTINO}/robot.png`);
+    }
+    await pagina.mouse.move(10, 10);
+  }
+
   if (toca("asistente")) {
     await pagina.getByRole("tab", { name: "Resumen", exact: true }).click();
     await pagina.getByRole("button", { name: "Asistente" }).click();
@@ -130,6 +154,23 @@ try {
     await pagina.waitForTimeout(800);
     await pagina.screenshot({ path: `${DESTINO}/asistente.png` });
     console.log(`  ${DESTINO}/asistente.png`);
+  }
+  if (toca("movil")) {
+    // El tablero en un telefono, con su barra de abajo. Contexto propio: el
+    // ancho decide el diseño desde la primera pintura.
+    const movil = await navegador.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+    });
+    await movil.addCookies(await contexto.cookies());
+    const tel = await movil.newPage();
+    await tel.goto(`${BASE}/`);
+    await tel.waitForTimeout(4000);
+    await tel.screenshot({ path: `${DESTINO}/movil.png` });
+    console.log(`  ${DESTINO}/movil.png`);
+    await movil.close();
   }
 } finally {
   await navegador.close();

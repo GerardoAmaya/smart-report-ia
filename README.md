@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://smart-report-sv.duckdns.org/health"><img alt="En producción" src="https://img.shields.io/badge/producción-en%20línea-1f6f5c"></a>
-  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-282%20%2B%209%20E2E-1f6f5c">
+  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-312%20%2B%209%20E2E-1f6f5c">
   <img alt="Costo de infraestructura" src="https://img.shields.io/badge/infraestructura-USD%200%2Fmes-c77b23">
 </p>
 
@@ -140,13 +140,20 @@ cámara gira despacio. Sin librerías de 3D: es el mismo MapLibre.
 
 ![Mapa 3D con edificios en relieve y la columna de un caso urgente](docs/capturas/tablero-mapa-3d.jpg)
 
-**Pregúntale al tablero.** Un panel donde se escribe «¿qué quedó pendiente?» o
-«resumen de la semana», y el modelo contesta con los datos del sistema y
-enlaces a cada caso. **Solo puede mirar**: sus herramientas son consultas
-escritas en código, corren en una transacción de solo lectura, y asignar o
-cerrar sigue siendo cosa del panel de cada caso.
+**Pregúntale al tablero.** Lo abre un robot que flota en la esquina: sigue el
+cursor con los ojos, parpadea, se pone contento cuando lo señalas, se duerme si
+nadie lo usa y se puede arrastrar a donde estorbe menos. De vez en cuando avisa
+—«Hay 2 casos urgentes abiertos»— con el número real.
 
-![El asistente respondiendo qué casos urgentes quedan pendientes](docs/capturas/asistente.png)
+<p align="center"><img src="docs/capturas/robot.png" alt="El robot del asistente, con casco de obra y la etiqueta IA, sonriendo" width="200"></p>
+
+En el panel se escribe «¿qué quedó pendiente?» o «resumen de la semana», y el
+modelo contesta con los datos del sistema y enlaces a cada caso. **Solo puede
+mirar**: sus herramientas son consultas escritas en código, corren en una
+transacción de solo lectura, y asignar o cerrar sigue siendo cosa del panel de
+cada caso.
+
+![El asistente respondiendo qué quedó pendiente](docs/capturas/asistente.png)
 
 Y donde el sistema duda, una segunda mirada: en un reporte que quedó en el
 límite de la agrupación, **«Comparar las fotos»** le pide al modelo que mire las
@@ -158,9 +165,17 @@ resumen trae un feed con lo que ocurre de verdad —reportes que entran, casos q
 se juntan, asignaciones, cierres y a cuántas personas se avisó—, que se mueve
 solo por los mismos avisos de Postgres que el resto del tablero.
 
+**Usuarios y perfil.** Quién entra lo decide una lista de correos autorizados
+con su rol, y ahora se gestiona desde el tablero: un administrador autoriza un
+correo, cambia roles o quita el acceso, sin tocar el servidor. Nadie se puede
+quitar a sí mismo el rol de administrador, y nunca se queda el sistema sin
+uno. Cada persona tiene su foto —la de Google, o una propia— y su nombre.
+
 En el celular el tablero cambia de forma: una barra abajo con Cola, Resumen,
 Caso y Mapa, y cada vista a pantalla completa. Quien despacha desde la calle
 puede asignar, marcar en curso y subir la foto del arreglo desde el teléfono.
+
+<p align="center"><img src="docs/capturas/movil.png" alt="El tablero en un teléfono, con la barra de navegación abajo" width="300"></p>
 
 > Las capturas del tablero las saca un guion contra lo que haya en la base, no
 > una mano: `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`.
@@ -224,6 +239,7 @@ El razonamiento completo, y lo que cada decisión costó descubrir, está en
 | **Canal** | Telegram Bot API, detrás de una interfaz `InboundChannel` | sin instalar nada; WhatsApp sería otro adaptador, no un rediseño |
 | **Fotos** | Cloudflare R2 (S3), MinIO en local | el tablero sirve las mismas fotos ocho horas al día, y R2 no cobra salida |
 | **Tablero** | Next.js 16 · React 19 · TypeScript 6 · Tailwind 4 · shadcn/ui · cmdk · Sonner | |
+| **Movimiento** | Motion · componentes de Magic UI copiados al proyecto | animaciones con propósito; todo se queda quieto con «reducir movimiento» |
 | **Mapa** | MapLibre 6 con teselas de OpenFreeMap | gratis, sin clave y sin límite de cargas |
 | **Datos en vivo** | TanStack Query + SSE | el tablero escucha y no habla: no hace falta WebSocket |
 | **Servidor** | Docker Compose · Caddy 2 · Oracle Cloud Always Free (ARM) | un solo origen con HTTPS automático, sin CORS |

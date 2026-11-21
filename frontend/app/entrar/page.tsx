@@ -6,15 +6,18 @@
  * Dos mitades. La izquierda dice de que va esto —la marca y para que sirve—
  * sobre San Salvador de fondo; la derecha es para entrar. Sin cifras: hubo
  * cuatro, y se quitaron. Quien despacha cruza esta puerta todos los dias, y
- * numeros que va a ver dentro del tablero solo cargaban la entrada. Es la unica pantalla donde lo vistoso se permite: el tablero
- * lo mira alguien ocho horas y ahi manda la calma.
+ * numeros que va a ver dentro del tablero solo cargaban la entrada.
+ *
+ * Es la unica pantalla donde lo vistoso se permite: el tablero lo mira alguien
+ * ocho horas y ahi manda la calma. Las animaciones viven en EntradaAnimada.tsx,
+ * con sus reglas: nada bloquea el formulario y con movimiento reducido nada se
+ * mueve.
  *
  * Dos formas de entrar, y la diferencia se dice en voz alta: Google para quien
  * trabaja aqui, contraseña para quien viene a mirar. Esconder que el usuario de
  * prueba es limitado haria que alguien se topara con un 403 sin saber por que.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -28,12 +31,22 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
 import { CambiarTema } from "@/componentes/CambiarTema";
+import {
+  EntraEnCascada,
+  LineaPintada,
+  LogoQueCae,
+  PinQueLlega,
+  TarjetaConBrillo,
+} from "@/componentes/EntradaAnimada";
 import { MarcaGoogle, MarcaTelegram } from "@/componentes/Marcas-svg";
 
 // Solo en el navegador: MapLibre toca `window` al cargarse.
-const MapaFondo = dynamic(() => import("@/componentes/MapaFondo").then((m) => m.MapaFondo), {
-  ssr: false,
-});
+const MapaFondo = dynamic(
+  () => import("@/componentes/MapaFondo").then((m) => m.MapaFondo),
+  {
+    ssr: false,
+  },
+);
 
 const SOLO_MIRA =
   "Solo mira: la cola, los casos, el mapa y las métricas. Despachar es para operadores, porque los casos son reales.";
@@ -89,34 +102,37 @@ export default function Entrar() {
               hacia la derecha: con un velo parejo los nombres de las colonias se
               mezclaban con el texto. */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background from-35% via-background/90 via-60% to-background/35" />
+          {/* Sobre la parte del mapa que el velo deja ver, lejos del texto. */}
+          <PinQueLlega className="top-[44%] left-[78%]" />
         </div>
 
         <div className="relative flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/marca/avatar-bot.png" alt="" className="size-10 rounded-full shadow-sm" />
+          <LogoQueCae className="size-10 rounded-full shadow-sm" />
           <div className="leading-tight">
             <p className="font-semibold tracking-tight">Smart Report</p>
-            <p className="text-xs text-muted-foreground">Vía pública · El Salvador</p>
+            <p className="text-xs text-muted-foreground">
+              Vía pública · El Salvador
+            </p>
           </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: "easeOut" }}
-          className="relative max-w-xl"
-        >
-          <h1 className="text-3xl leading-[1.05] font-semibold tracking-tight text-balance lg:text-5xl">
-            Lo que ves en la calle, <span className="text-primary">atendido.</span>
-          </h1>
-          <LineaPintada className="mt-6" />
-          <p className="mt-6 max-w-md text-pretty text-muted-foreground lg:text-lg">
-            Una foto por Telegram. Quienes reportan lo mismo quedan en un solo caso, y cuando se
-            arregla, a todos les llega la foto del arreglo.
-          </p>
-        </motion.div>
+        <div className="relative max-w-xl">
+          <EntraEnCascada retraso={0.15}>
+            <h1 className="text-3xl leading-[1.05] font-semibold tracking-tight text-balance lg:text-5xl">
+              Lo que ves en la calle,{" "}
+              <span className="text-primary">atendido.</span>
+            </h1>
+          </EntraEnCascada>
+          <LineaPintada retraso={0.45} className="mt-6" />
+          <EntraEnCascada retraso={0.65}>
+            <p className="mt-6 max-w-md text-pretty text-muted-foreground lg:text-lg">
+              Una foto por Telegram. Quienes reportan lo mismo quedan en un solo
+              caso, y cuando se arregla, a todos les llega la foto del arreglo.
+            </p>
+          </EntraEnCascada>
+        </div>
 
-        <div className="relative space-y-6">
+        <EntraEnCascada retraso={0.85} className="relative space-y-6">
           <a
             href="https://t.me/smartreport_sv_bot"
             target="_blank"
@@ -124,9 +140,10 @@ export default function Entrar() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <MarcaTelegram className="size-4" />
-            Reportar un problema: <span className="font-medium">@smartreport_sv_bot</span>
+            Reportar un problema:{" "}
+            <span className="font-medium">@smartreport_sv_bot</span>
           </a>
-        </div>
+        </EntraEnCascada>
       </section>
 
       {/* --- Entrar --- */}
@@ -137,80 +154,72 @@ export default function Entrar() {
           <CambiarTema />
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
-          className="w-full max-w-sm space-y-8 rounded-xl border bg-card p-7 shadow-sm sm:p-8"
-        >
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight">Entrar al tablero</h2>
-            <p className="text-sm text-muted-foreground">
-              Para quien despacha: la cola de casos, el mapa y el cierre con evidencia.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Button asChild variant="outline" className="h-11 w-full text-sm">
-              <a href={api.urlEntrarConGoogle()}>
-                <MarcaGoogle className="size-4" />
-                Entrar con Google
-              </a>
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Solo cuentas autorizadas. Tener cuenta de Google no da acceso.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs tracking-wider text-muted-foreground uppercase">
-              o mirar como invitado
-            </span>
-            <Separator className="flex-1" />
-          </div>
-
-          <form onSubmit={entrarDePrueba} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Usuario de prueba</Label>
-              <p className="text-xs text-muted-foreground">
-                {config?.demo_can_dispatch ? DESPACHA : SOLO_MIRA}
+        <TarjetaConBrillo retraso={0.2} className="max-w-sm">
+          <div className="space-y-8 p-7 sm:p-8">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Entrar al tablero
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Para quien despacha: la cola de casos, el mapa y el cierre con
+                evidencia.
               </p>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                placeholder="Contraseña"
-                className="h-10"
-              />
             </div>
-            <Button type="submit" disabled={enviando || !password} className="h-10 w-full">
-              <Eye className="size-4" />
-              {enviando ? "Entrando…" : "Entrar a mirar"}
-            </Button>
-          </form>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-        </motion.div>
+            <div className="space-y-2">
+              <Button asChild variant="outline" className="h-11 w-full text-sm">
+                <a href={api.urlEntrarConGoogle()}>
+                  <MarcaGoogle className="size-4" />
+                  Entrar con Google
+                </a>
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Solo cuentas autorizadas. Tener cuenta de Google no da acceso.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-xs tracking-wider text-muted-foreground uppercase">
+                o mirar como invitado
+              </span>
+              <Separator className="flex-1" />
+            </div>
+
+            <form onSubmit={entrarDePrueba} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Usuario de prueba</Label>
+                <p className="text-xs text-muted-foreground">
+                  {config?.demo_can_dispatch ? DESPACHA : SOLO_MIRA}
+                </p>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="Contraseña"
+                  className="h-10"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={enviando || !password}
+                className="h-10 w-full"
+              >
+                <Eye className="size-4" />
+                {enviando ? "Entrando…" : "Entrar a mirar"}
+              </Button>
+            </form>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </TarjetaConBrillo>
       </section>
     </main>
   );
 }
-
-/** La linea discontinua de una via: el material del problema, como en la paleta. */
-function LineaPintada({ className }: { className?: string }) {
-  return (
-    <div
-      aria-hidden
-      className={`h-1.5 w-24 rounded-full bg-[repeating-linear-gradient(90deg,var(--atencion)_0_16px,transparent_16px_26px)] ${className ?? ""}`}
-    />
-  );
-}
-
-

@@ -44,6 +44,23 @@ Despachar = Annotated[User, Depends(requiere(Permission.DESPACHAR))]
 Borrar = Annotated[User, Depends(requiere(Permission.BORRAR))]
 
 
+def direccion_del_caso():
+    """La direccion del caso: la del primer reporte que tenga una.
+
+    No se guarda en el caso: el caso es un centroide que se mueve al entrar
+    cada reporte, y una direccion que se recalcula cambiaria de nombre sola.
+    Subconsulta correlacionada con `Case`, para usarla en el mismo SELECT.
+    """
+    return (
+        select(Report.address_text)
+        .where(Report.case_id == Case.id, Report.address_text.is_not(None))
+        .order_by(Report.created_at)
+        .limit(1)
+        .correlate(Case)
+        .scalar_subquery()
+    )
+
+
 def _url_de_foto(clave: str | None) -> str | None:
     """Enlace temporal. El navegador baja directo del almacenamiento."""
     return storage.presigned_url(clave) if clave else None
@@ -73,17 +90,7 @@ def listar_casos(
         else_=3,
     )
 
-    # La direccion del caso es la del primer reporte que tenga una. No se
-    # guarda en el caso: el caso es un centroide que se mueve al entrar cada
-    # reporte, y una direccion que se recalcula cambiaria de nombre sola.
-    direccion = (
-        select(Report.address_text)
-        .where(Report.case_id == Case.id, Report.address_text.is_not(None))
-        .order_by(Report.created_at)
-        .limit(1)
-        .correlate(Case)
-        .scalar_subquery()
-    )
+    direccion = direccion_del_caso()
 
     # La miniatura de la primera foto guardada del caso, en la misma consulta:
     # una por caso seria una consulta por fila de la cola. Firmar el enlace no

@@ -12,6 +12,7 @@ from app import logging_setup
 from app.config import settings
 from app.db import engine
 from app.health import build_health
+from app.routes_actividad import router as actividad_router
 from app.routes_asistente import router as asistente_router
 from app.routes_auth import router as auth_router
 from app.routes_board import router as board_router
@@ -78,6 +79,7 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.include_router(webhook_router)
 app.include_router(auth_router)
 app.include_router(board_router)
+app.include_router(actividad_router)
 app.include_router(asistente_router)
 app.include_router(public_router)
 app.include_router(stream_router)

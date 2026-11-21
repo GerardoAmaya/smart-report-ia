@@ -92,7 +92,7 @@ export function Metricas({ alElegirCaso }: { alElegirCaso: (id: string) => void 
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 p-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-3 md:p-6">
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-32" />
         ))}
@@ -118,9 +118,9 @@ export function Metricas({ alElegirCaso }: { alElegirCaso: (id: string) => void 
         variants={ESCALONADO}
         initial="oculta"
         animate="visible"
-        className="relative z-[1] mx-auto max-w-5xl space-y-4 p-6"
+        className="relative z-[1] mx-auto max-w-5xl space-y-4 p-4 md:p-6"
       >
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Hero
             reportes={data.reportes}
             casos={data.casos}
@@ -141,7 +141,7 @@ export function Metricas({ alElegirCaso }: { alElegirCaso: (id: string) => void 
           />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
           <motion.div variants={TARJETA} className="lg:col-span-3">
             <TarjetaVidrio className="h-full">
               <CardHeader>
@@ -326,7 +326,7 @@ export function Metricas({ alElegirCaso }: { alElegirCaso: (id: string) => void 
           </motion.div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
           <motion.div variants={TARJETA} className="lg:col-span-3">
             <Severidades datos={data.severidades} costo={data.costo_usd} />
           </motion.div>

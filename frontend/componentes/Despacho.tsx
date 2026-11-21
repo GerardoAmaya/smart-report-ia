@@ -151,7 +151,7 @@ export function Despacho({ caso }: { caso: Detalle }) {
             ) : (
               <div className="flex flex-wrap gap-2">
                 <Select value={cuadrilla} onValueChange={setCuadrilla}>
-                  <SelectTrigger size="sm" className="w-[240px]">
+                  <SelectTrigger size="sm" className="w-full sm:w-[240px]">
                     <SelectValue placeholder="Elegí una cuadrilla" />
                   </SelectTrigger>
                   <SelectContent>
@@ -288,7 +288,7 @@ export function Despacho({ caso }: { caso: Detalle }) {
  * Los tres numeros son **personas**, no mensajes: cada una recibe hasta tres
  * avisos, y la API la cuenta una sola vez, en el grupo mas preocupante.
  */
-function Avisos({ notificaciones }: { notificaciones: Detalle["notifications"] }) {
+export function Avisos({ notificaciones }: { notificaciones: Detalle["notifications"] }) {
   const { sent, pending, failed } = notificaciones;
   if (sent + pending + failed === 0) return null;
   const personas = (n: number) => (n === 1 ? "1 persona" : `${n} personas`);
@@ -312,7 +312,7 @@ function Avisos({ notificaciones }: { notificaciones: Detalle["notifications"] }
   );
 }
 
-function Evidencias({ fotos }: { fotos: Detalle["evidence"] }) {
+export function Evidencias({ fotos }: { fotos: Detalle["evidence"] }) {
   if (fotos.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2">

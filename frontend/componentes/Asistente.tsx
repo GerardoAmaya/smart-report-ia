@@ -117,9 +117,15 @@ export function BotonAsistente({
   return (
     <Sheet open={abierto} onOpenChange={setAbierto}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm" className={cn("gap-1.5", className)}>
-          <Sparkles className="size-3.5" />
-          Asistente
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Asistente"
+          className={cn("gap-1.5 max-lg:size-8 max-lg:px-0", className)}
+        >
+          <Sparkles className="size-3.5 max-lg:size-4" />
+          {/* En el celular, solo el icono: el texto no cabe junto al resto. */}
+          <span className="hidden lg:inline">Asistente</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">

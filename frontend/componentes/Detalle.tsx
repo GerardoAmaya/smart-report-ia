@@ -33,6 +33,7 @@ import { categoria, hace, metros } from "@/lib/textos";
 import { puede, useSesion } from "@/lib/sesion";
 import { Comparar } from "./Comparar";
 import { Despacho } from "./Despacho";
+import { DespachoLectura } from "./DespachoLectura";
 import { CargandoDetalle, Fallo, Vacio } from "./Estados";
 import { Estado, Severidad } from "./Marcas";
 
@@ -112,7 +113,9 @@ export function Detalle({ casoId }: { casoId: string | null }) {
 
       </header>
 
-      {puedeDespachar && <Despacho caso={data} />}
+      {/* Quien no despacha ve lo mismo sin nada que lo cambie: lo que el despacho
+          deja —cuadrilla, foto del arreglo, avisos— es la prueba del sistema. */}
+      {puedeDespachar ? <Despacho caso={data} /> : <DespachoLectura caso={data} />}
 
       <Separator className="my-6" />
 

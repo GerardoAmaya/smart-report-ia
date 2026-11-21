@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -16,6 +16,14 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", dis
 export const metadata: Metadata = {
   title: "Smart Report",
   description: "Reportes ciudadanos de hallazgos en la vía pública de El Salvador",
+};
+
+// `viewport-fit=cover` para que `env(safe-area-inset-*)` tenga valor: sin
+// esto vale 0 y la barra inferior del celular queda bajo la raya de gestos.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

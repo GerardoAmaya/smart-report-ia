@@ -71,7 +71,7 @@ export function Buscador({
         variant="outline"
         size="sm"
         onClick={() => setAbierto(true)}
-        className="h-8 gap-2 text-xs text-muted-foreground"
+        className="h-8 gap-2 text-xs text-muted-foreground max-lg:w-8 max-lg:px-0"
         aria-label="Buscar un caso"
       >
         <Search className="size-3.5" />

@@ -1,7 +1,7 @@
 # Imagen de produccion. Aparte de la de desarrollo a proposito: aquella monta
 # el codigo, instala las herramientas de prueba y recarga al guardar. Eso en un
 # servidor publico es peso y superficie de ataque de mas.
-FROM python:3.13-slim AS deps
+FROM python:3.15-slim AS deps
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY pyproject.toml ./
 RUN mkdir -p app && touch app/__init__.py \
     && pip install --no-cache-dir --prefix=/instalado .
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app

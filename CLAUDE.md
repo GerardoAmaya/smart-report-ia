@@ -602,6 +602,25 @@ es una puerta que se cruza a diario, y lo que se publica sin sesion lo puede
 pedir cualquiera. `/public/config` dice una sola cosa —si el invitado
 despacha— para que el texto de la entrada no mienta.
 
+**El movimiento del tablero tiene que significar algo.** Se mira ocho horas:
+se mueve lo que cambia —un evento que llega, un caso nuevo, un numero que sube—
+y se queda quieto lo que se lee. Lo unico en bucle es decorado de fondo (la
+aurora del resumen, la orbita del mapa cuando nadie lo toca) o una señal que
+importa (el pulso, solo en lo urgente: si latiera todo, no diria nada). Todo
+respeta «movimiento reducido» y la orbita se detiene al primer contacto.
+
+**El 3D va en el mapa, no en las graficas.** Una barra en perspectiva deforma la
+cantidad que muestra; una columna sobre la ciudad dice donde. Y sin deck.gl
+(unos 300 KB) ni H3 (WebAssembly): los hexagonos son cien lineas propias
+dibujadas con el `fill-extrusion` del mismo MapLibre. El 3D encuadra el grupo
+mas denso y no todos los casos: encuadrarlos todos, con algunos a kilometros,
+alejaba la camara hasta que nada se veia.
+
+**El feed de actividad se arma de lo que ya existe**, sin tabla de eventos: cinco
+consultas sobre reportes, casos y avisos. Una tabla de eventos seria una
+segunda verdad que mantener al dia; esta no se puede desincronizar. Y no
+muestra nada de quien reporto: ni su usuario ni lo que escribio.
+
 **Un enlace con `?caso=` abre en el caso**, no en el resumen. El caso va en la
 URL para poder compartirlo, y abrirlo en el resumen obligaba a buscarlo otra
 vez.

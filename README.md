@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://smart-report-sv.duckdns.org/health"><img alt="En producción" src="https://img.shields.io/badge/producción-en%20línea-1f6f5c"></a>
-  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-275%20%2B%209%20E2E-1f6f5c">
+  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-282%20%2B%209%20E2E-1f6f5c">
   <img alt="Costo de infraestructura" src="https://img.shields.io/badge/infraestructura-USD%200%2Fmes-c77b23">
 </p>
 
@@ -143,8 +143,17 @@ Y donde el sistema duda, una segunda mirada: en un reporte que quedó en el
 límite de la agrupación, **«Comparar las fotos»** le pide al modelo que mire las
 dos y diga en qué se parecen y en qué no. Da una sugerencia; decide la persona.
 
-Además: buscador con **Ctrl+K**, miniatura de cada foto en la cola, y un aviso
-en pantalla cada vez que se despacha algo, con a cuántas personas se les avisó.
+Además: buscador con **Ctrl+K**, miniatura de cada foto en la cola, un aviso en
+pantalla cada vez que se despacha algo, y **«Lo que acaba de pasar»**: el
+resumen trae un feed con lo que ocurre de verdad —reportes que entran, casos que
+se juntan, asignaciones, cierres y a cuántas personas se avisó—, que se mueve
+solo por los mismos avisos de Postgres que el resto del tablero.
+
+El mapa tiene **vista 3D**: los edificios en relieve y los casos como columnas
+por zona, más altas donde más gente reporta y rojas donde hay algo urgente.
+Encuadra solo la zona con más reportes, las columnas crecen al entrar, y si
+nadie lo toca la cámara gira despacio. Sin librerías de 3D: es el mismo
+MapLibre, y el tablero pesa unos 10 KB más.
 
 > Las capturas del tablero las saca un guion contra lo que haya en la base, no
 > una mano: `cd frontend && DEMO_PASSWORD=… node scripts/capturas.mjs`.

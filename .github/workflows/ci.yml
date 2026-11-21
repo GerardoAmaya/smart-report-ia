@@ -37,7 +37,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Sin credenciales en el repositorio
         # El token del bot estuvo en una prueba y se filtro por el repositorio
@@ -74,7 +74,7 @@ jobs:
           done
           curl -sf http://localhost:9000/minio/health/live
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -127,8 +127,8 @@ jobs:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Imagen de la API
         run: docker build -f backend/Dockerfile.prod -t smart-report-api:prod backend/
@@ -203,8 +203,8 @@ jobs:
     needs: [backend, frontend]
 
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -239,7 +239,7 @@ jobs:
         if: failure()
         run: docker compose --profile e2e logs --tail 120
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report

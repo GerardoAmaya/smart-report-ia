@@ -274,6 +274,9 @@ CLASSIFICATION_STATUSES = (
     "proposed",
     "confirmed",
     "corrected",
+    # La persona eligio porque el modelo no propuso nada: no hay a quien
+    # corregir. Ver la migracion 0022.
+    "chosen",
     "failed",
 )
 

@@ -248,6 +248,11 @@ function Fila({
             La persona corrigió la categoría que propuso el modelo.
           </p>
         )}
+        {reporte.classification?.chosen && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            La persona eligió la categoría: no hubo propuesta del modelo.
+          </p>
+        )}
 
         <Senales decisiva={decisiva} />
 

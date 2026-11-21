@@ -55,7 +55,7 @@ ETIQUETA_CATEGORIA: dict[str, str] = {
     Category.AGUA: "el agua o drenaje",
     Category.DESECHOS: "la basura",
     Category.RIESGO_ESTRUCTURAL: "el riesgo de derrumbe",
-    Category.ESPACIO_PUBLICO: "el espacio publico",
+    Category.ESPACIO_PUBLICO: "el espacio público",
 }
 
 
@@ -125,18 +125,39 @@ def mensaje(
 
     if kind == "assigned":
         quien = f" a {crew.name}" if crew else ""
-        return (
+        texto = (
             f"Tu reporte sobre {_cosa(caso)} ya fue asignado{quien}. "
             f"Te aviso cuando esté resuelto.{cola}"
         )
-    if kind == "in_progress":
-        return f"Ya están trabajando en lo que reportaste sobre {_cosa(caso)}.{cola}"
-    if kind == "closed":
+    elif kind == "in_progress":
+        texto = f"Ya están trabajando en lo que reportaste sobre {_cosa(caso)}.{cola}"
+    elif kind == "closed":
         base = f"Lo que reportaste sobre {_cosa(caso)} quedó resuelto."
         if caso.closing_note:
             base += f"\n\n{caso.closing_note}"
-        return base + cola + "\n\nGracias por reportarlo."
-    return f"Hubo un cambio en lo que reportaste.{cola}"
+        texto = base + cola + "\n\nGracias por reportarlo."
+    else:
+        texto = f"Hubo un cambio en lo que reportaste.{cola}"
+    return texto + _atribucion(reporte)
+
+
+# La calle y la colonia salen de OpenStreetMap, y su licencia (ODbL) pide decir
+# de donde viene lo que se publica derivado de sus datos. Solo cuando el aviso
+# lleva direccion: sin ella no se uso nada de OSM.
+ATRIBUCION_OSM = "Dirección: © colaboradores de OpenStreetMap"
+
+
+def _atribucion(reporte: Report | None) -> str:
+    """La linea de atribucion, al final y en su propio parrafo.
+
+    Al final para que sea discreta y no se interponga entre lo que importa.
+    Que el enlace al punto deje de ser lo ultimo no rompe la regla del enlace:
+    lo que se traga Telegram es un punto **pegado** a la URL, y aqui va un
+    salto de linea en medio. Por eso tampoco lleva punto final.
+    """
+    if reporte is None or not reporte.address_text:
+        return ""
+    return f"\n\n{ATRIBUCION_OSM}"
 
 
 def destinatarios(session: Session, caso: Case) -> list[tuple[str, str, Report]]:

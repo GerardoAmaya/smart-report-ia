@@ -233,3 +233,41 @@ def test_la_direccion_llega_al_aviso(session, monkeypatch):
     assert "en Calle Real, Nejapa." in texto
     # El punto sigue: la direccion es la comodidad, no el dato.
     assert "maps.google.com" in texto
+
+
+def test_el_aviso_con_direccion_dice_que_viene_de_openstreetmap(session, monkeypatch):
+    """La ODbL pide atribucion en lo que se publica derivado de OSM.
+
+    Solo cuando el aviso lleva direccion, y sin romper la regla del enlace: la
+    URL no puede quedar pegada a un punto, que Telegram se tragaria.
+    """
+    import re
+
+    from app import dispatch
+    from app.models import Case
+
+    caso = Case(category="agua", status="assigned")
+    session.add(caso)
+    session.flush()
+    reporte = _reporte(session)
+    reporte.case_id = caso.id
+    session.commit()
+
+    # Sin direccion: no se uso nada de OSM y no hay nada que atribuir.
+    sin = dispatch.mensaje(caso, "assigned", None, reporte, session)
+    assert "OpenStreetMap" not in sin
+
+    responder(
+        monkeypatch,
+        RespuestaFalsa(datos={"address": {"road": "Calle Real", "city": "Nejapa"}}),
+    )
+    geocode_worker.run_once(session)
+    session.refresh(reporte)
+
+    for kind in ("assigned", "in_progress", "closed"):
+        texto = dispatch.mensaje(caso, kind, None, reporte, session)
+        assert texto.rstrip().endswith(dispatch.ATRIBUCION_OSM), kind
+        url = re.search(r"https://maps\.google\.com/\?q=[-0-9.,]+", texto)
+        assert url, kind
+        # Lo que sigue a la URL es un salto de linea, nunca un punto.
+        assert texto[url.end()] == "\n", kind

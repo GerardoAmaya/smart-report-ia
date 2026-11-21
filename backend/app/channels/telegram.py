@@ -119,7 +119,7 @@ class TelegramChannel:
             # El boton nativo. La ubicacion nunca sale de los EXIF de la foto:
             # Telegram comprime las imagenes y les quita los metadatos.
             cuerpo["reply_markup"] = {
-                "keyboard": [[{"text": "Enviar mi ubicacion", "request_location": True}]],
+                "keyboard": [[{"text": "Enviar mi ubicación", "request_location": True}]],
                 "resize_keyboard": True,
                 "one_time_keyboard": True,
             }

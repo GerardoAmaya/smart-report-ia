@@ -53,10 +53,16 @@ class Resultado:
 
 
 def labeled(session: Session) -> list[Classification]:
-    """Las clasificaciones que alguien confirmo o corrigio."""
+    """Las clasificaciones que alguien confirmo o corrigio.
+
+    Por estado y no solo por fecha: las "chosen" tambien tienen confirmed_at,
+    pero la persona eligio sin propuesta y no dicen nada del acierto del modelo.
+    La condicion sobre la propuesta queda como segunda red.
+    """
     return list(
         session.execute(
             select(Classification).where(
+                Classification.status.in_(("confirmed", "corrected")),
                 Classification.confirmed_at.is_not(None),
                 Classification.proposed_category.is_not(None),
                 Classification.final_category.is_not(None),

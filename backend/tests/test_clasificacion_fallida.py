@@ -125,3 +125,24 @@ def test_elegir_la_categoria_la_deja_con_severidad(client, session, modelo_caido
     assert ultimo_intento.final_category == Category.VIALIDAD.value
     assert ultimo_intento.final_severity == "media"
     assert ultimo_intento.confirmed_at is not None
+
+
+def test_elegir_sin_propuesta_queda_elegida_y_no_corregida(
+    client, session, modelo_caido, ultimo_intento
+):
+    """Sin propuesta nadie corrigio al modelo: la persona eligio desde cero.
+
+    Quedaba como "corrected" y el tablero decia «La persona corrigió la
+    categoría que propuso el modelo», cuando el modelo no propuso nada.
+    """
+    classify_worker.run_once(session)
+
+    client.post(
+        "/webhooks/telegram",
+        json=update_con_boton(user_id=USUARIO, data=f"c:{ultimo_intento.id}:0"),
+        headers={SECRET_HEADER: SECRETO_DE_PRUEBA},
+    )
+
+    session.refresh(ultimo_intento)
+    assert ultimo_intento.status == "chosen"
+    assert ultimo_intento.proposed_category is None

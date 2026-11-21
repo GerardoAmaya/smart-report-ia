@@ -30,13 +30,13 @@ ETIQUETAS: dict[str, str] = {
     Category.AGUA: "Agua o drenaje",
     Category.DESECHOS: "Basura",
     Category.RIESGO_ESTRUCTURAL: "Riesgo de derrumbe",
-    Category.ESPACIO_PUBLICO: "Parque o espacio publico",
+    Category.ESPACIO_PUBLICO: "Parque o espacio público",
     Category.NO_ES_REPORTE: "No es un reporte",
 }
 
 ETIQUETA_SEVERIDAD: dict[str, str] = {
     Severity.ALTA: "urgente",
-    Severity.MEDIA: "atencion",
+    Severity.MEDIA: "atención",
     Severity.BAJA: "sin urgencia",
 }
 
@@ -54,13 +54,13 @@ def pregunta(clasificacion: Classification) -> tuple[str, list[tuple[str, str]]]
     # Sin Markdown a proposito: `proposed_reason` lo escribe el modelo y un
     # guion bajo suelto haria que Telegram rechace el mensaje entero con 400.
     texto = (
-        f"Revise tu reporte y creo que es:\n\n"
+        f"Revisé tu reporte y creo que es:\n\n"
         f"{etiqueta} ({severidad})\n"
         f"{clasificacion.proposed_reason}\n\n"
         f"¿Es correcto?"
     )
     opciones = [
-        ("Si, es correcto", f"{PREFIJO_SI}{clasificacion.id}"),
+        ("Sí, es correcto", f"{PREFIJO_SI}{clasificacion.id}"),
         ("No, es otra cosa", f"{PREFIJO_NO}{clasificacion.id}"),
     ]
     return texto, opciones
@@ -68,7 +68,7 @@ def pregunta(clasificacion: Classification) -> tuple[str, list[tuple[str, str]]]
 
 def opciones_de_categoria(clasificacion: Classification) -> tuple[str, list[tuple[str, str]]]:
     """La lista de categorias, para cuando la persona corrige."""
-    texto = "¿Que es entonces?"
+    texto = "¿Qué es entonces?"
     # Se numera por posicion y no por nombre: el uuid ya ocupa 36 de los 64
     # bytes que Telegram permite en callback_data.
     opciones = [
@@ -99,7 +99,7 @@ def _resumen(clasificacion: Classification, encabezado: str, categoria: str) -> 
     """
     etiqueta = ETIQUETAS.get(categoria, categoria)
     severidad = ETIQUETA_SEVERIDAD.get(clasificacion.final_severity, "")
-    return f"{encabezado}\n\n{etiqueta} ({severidad})\n\nTe aviso por aqui cuando se atienda."
+    return f"{encabezado}\n\n{etiqueta} ({severidad})\n\nTe aviso por aquí cuando se atienda."
 
 
 def _buscar(session: Session, cid: str, external_user_id: str) -> Classification | None:
@@ -181,7 +181,9 @@ def handle_choice(session: Session, external_user_id: str, valor: str) -> tuple[
         clasificacion.final_severity = clasificacion.proposed_severity or (
             SEVERIDAD_SIN_PROPUESTA.value
         )
-        clasificacion.status = "corrected"
+        # Sin propuesta no hubo correccion: la persona eligio desde cero. Si
+        # quedara "corrected", el tablero diria que corrigio al modelo.
+        clasificacion.status = "chosen" if sin_propuesta else "corrected"
         clasificacion.confirmed_at = datetime.now(UTC)
         _agrupar(session, clasificacion)
         encabezado = (

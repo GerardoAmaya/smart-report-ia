@@ -24,27 +24,27 @@ from app.models import InboundUpdate, Report, ReportPhoto
 # mensajes sueltos.
 CAPTION_MAX = 2000
 
-PEDIR_FOTO = "Mandame una foto del problema y despues tu ubicacion."
+PEDIR_FOTO = "Mandame una foto del problema y después tu ubicación."
 PEDIR_UBICACION = (
-    "Recibi la foto. Ahora mandame la ubicacion con el boton de abajo, para saber donde esta."
+    "Recibí la foto. Ahora mandame la ubicación con el botón de abajo, para saber dónde está."
 )
 # No dice "quedo registrado" y punto: despues de esto llega la propuesta de
 # categoria, y un mensaje que suena a final hace que la pregunta siguiente
 # parezca de otra conversacion.
 LISTO = (
-    "Listo, ya tengo la foto y la ubicacion. Dame unos segundos, estoy "
-    "revisando la foto y te digo que creo que es.\n\n"
-    "Si querés, escribime que pasó. Ayuda a no confundirlo con otro reporte "
+    "Listo, ya tengo la foto y la ubicación. Dame unos segundos, estoy "
+    "revisando la foto y te digo qué creo que es.\n\n"
+    "Si querés, escribime qué pasó. Ayuda a no confundirlo con otro reporte "
     "cercano."
 )
 DETALLE_GUARDADO = "Anotado, gracias."
-YA_ESTA = "Ese reporte ya quedo listo. Si querés reportar otra cosa, mandame una foto."
-DETALLE_Y_FALTA_UBICACION = "Anotado. Todavia me falta la ubicacion."
-SIN_FOTO = "Primero mandame la foto del problema, y despues la ubicacion."
+YA_ESTA = "Ese reporte ya quedó listo. Si querés reportar otra cosa, mandame una foto."
+DETALLE_Y_FALTA_UBICACION = "Anotado. Todavía me falta la ubicación."
+SIN_FOTO = "Primero mandame la foto del problema, y después la ubicación."
 NO_ENTIENDO = "Solo puedo recibir fotos y ubicaciones."
 FOTO_MUY_GRANDE = "Esa foto es demasiado grande. Mandala como foto normal, no como archivo."
-UBICACION_INVALIDA = "Esas coordenadas no son validas. Usa el boton de ubicacion."
-DEMASIADOS = "Ya mandaste varios reportes en poco rato. Intenta de nuevo mas tarde."
+UBICACION_INVALIDA = "Esas coordenadas no son válidas. Usá el botón de ubicación."
+DEMASIADOS = "Ya mandaste varios reportes en poco rato. Intentá de nuevo más tarde."
 
 
 @dataclass(frozen=True)

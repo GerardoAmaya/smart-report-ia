@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/GerardoAmaya/smart-report-ia/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://smart-report-sv.duckdns.org/health"><img alt="En producción" src="https://img.shields.io/badge/producción-en%20línea-1f6f5c"></a>
-  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-312%20%2B%209%20E2E-1f6f5c">
+  <img alt="Pruebas" src="https://img.shields.io/badge/pruebas-337%20%2B%209%20E2E-1f6f5c">
   <img alt="Costo de infraestructura" src="https://img.shields.io/badge/infraestructura-USD%200%2Fmes-c77b23">
 </p>
 

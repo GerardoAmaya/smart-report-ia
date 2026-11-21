@@ -55,7 +55,7 @@ que existe:
 - Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
 - Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
 - Veinte migraciones, una por tabla, y seeders versionados aparte
-- 312 pruebas y 9 recorridos en verde, CI en verde
+- 337 pruebas y 9 recorridos en verde, CI en verde
 
 **La fase 6 se cerró el 15 de septiembre de 2026.** Un reporte real desde un
 teléfono recorrió todo —foto, ubicación, propuesta, confirmación, asignación,
@@ -656,6 +656,33 @@ shadcn serian dos modos oscuros, estilos que se pisan, unos 300 KB mas y un
 tablero con dos caras. Magic UI y similares se copian al proyecto, heredan la
 paleta y solo usan `motion`, que ya estaba.
 
+**La cola pagina por cursor, no por desplazamiento.** Ordena por gravedad,
+cantidad de reportes, antiguedad e `id`, y cambia en vivo: con un desplazamiento,
+un caso que entra arriba hace que la pagina siguiente repita o se salte filas.
+El cursor es la ultima fila de la pagina, y como el orden usa un conteo va en
+`HAVING`. Antes mostraba 50 y un caso nuevo y leve no se veia nunca.
+
+**No hay cambio de estado a mano.** `/status` cambiaba el estado sin cuadrilla,
+sin fechas y sin avisar a nadie; cada estado tiene su accion (`/assign`,
+`/start`, `/close`, `/reopen`) y es la unica forma de llegar a el.
+
+**Elegir no es corregir.** Si el modelo fallo y la persona eligio la categoria,
+la clasificacion queda `chosen`, no `corrected`: el tablero decia que la persona
+habia corregido una propuesta que nunca existio. La exactitud las excluye por
+estado.
+
+**El tope diario de IA se cuenta en hora de El Salvador.** Con el dia en UTC se
+reiniciaba a las 6 de la tarde. Las ventanas por minuto siguen en UTC: ahi el
+dia no importa.
+
+**Los avisos con direccion dicen de donde sale.** La ODbL pide atribucion en lo
+derivado de OpenStreetMap: «Dirección: © colaboradores de OpenStreetMap», en
+una linea propia al final. Despues de la URL hay un salto de linea, no un punto,
+asi que la regla del enlace sigue cumplida.
+
+**El bot habla de vos y con tildes**, como el resto: «después», «ubicación»,
+«Usá». Hay una prueba con la lista de faltas que ya se corrigieron.
+
 **La entrada se entiende en dos segundos.** Tuvo un titular que sonaba bien y no
 decia que era esto («Lo que ves en la calle, atendido»), una palabra que rotaba
 y una cinta de seis pasos: se movia mucho y explicaba poco. Ahora dice que es,
@@ -774,10 +801,6 @@ contra el segundo error, no contra el promedio de los dos.
   es `GEOCODE_BASE_URL`, porque la respuesta es la misma. Hasta entonces, si el
   servicio se cae, los reportes se quedan sin direccion y el aviso lleva solo
   el enlace, que es el comportamiento correcto.
-- **Los datos de direccion son de OpenStreetMap y piden atribucion.** La ODbL
-  la exige en lo que se publique derivado de ellos. El tablero ya la lleva en
-  el mapa; el aviso de Telegram no dice de donde sale la calle. Antes de
-  desplegar hay que decidir si ahi tambien va, y donde.
 - **Un `asyncio.run` por foto en el trabajador.** Monta un bucle de eventos
   por descarga. Es invisible al lado de la red, pero si algún día se procesan
   miles por minuto, ahí está.
@@ -793,22 +816,6 @@ contra el segundo error, no contra el promedio de los dos.
 - **Los filtros corporativos bloquean DuckDNS** por categoria (*Dynamic DNS*):
   desde una red asi el tablero no abre. Para quien despache detras de uno, hace
   falta un dominio propio.
-- **Un reporte sin propuesta del modelo sale como «corregido» en el tablero.**
-  Queda en `corrected` aunque nadie corrigio nada; la exactitud no se ensucia
-  porque `evaluation.py` excluye las filas sin propuesta. Distinguirlo pide un
-  estado nuevo con su migracion.
-- **La cola no tiene paginacion: muestra 50.** Ordena por gravedad, por
-  cantidad de reportes y, en empate, por antiguedad, asi que un caso nuevo, leve
-  y de un solo reporte cae al final y con mas de 50 no se ve en «Todo» sin
-  filtrar. En produccion hoy no pasa; con volumen real hace falta paginar o
-  cargar mas al bajar.
-- **El tope diario de IA se reinicia en UTC**, o sea a las 6 de la tarde en El
-  Salvador, no a medianoche.
-- **Los mensajes del bot van sin tildes** («Mandame una foto… despues tu
-  ubicacion»). Los del tablero ya las llevan; los de quien reporta, todavia no.
-- **`/status` todavia deja poner `assigned` o `in_progress` sin cuadrilla** y
-  sin avisar. El tablero no lo usa —solo las pruebas—, pero es la misma clase
-  de puerta lateral que tenia `closed`.
 - **Una falla de pytest sin identificar.** El 20 de noviembre una corrida dio
   1 fallo entre 250 y no se alcanzo a ver cual; trece corridas seguidas despues
   salieron limpias. Si vuelve, correr con `-rf` para tener el nombre antes de

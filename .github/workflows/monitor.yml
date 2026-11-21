@@ -1,0 +1,73 @@
+name: monitor
+
+# Revisa que produccion este viva y sana, desde fuera.
+#
+# Existe porque todo corre en una maquina gratuita que Oracle puede recuperar si
+# la ve ociosa, y nadie lo notaria hasta que un vecino reporte y no pase nada.
+# Si /health no contesta o no dice "ok", el job falla y GitHub le manda un
+# correo a quien edito este archivo por ultima vez: no hace falta otra cuenta.
+#
+# Cada 10 minutos y no cada 5: GitHub retrasa los cron cuando hay carga, y
+# pedirlo mas seguido no lo hace mas puntual. Se puede lanzar a mano desde la
+# pestaña Actions.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  salud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Produccion contesta y esta sana
+        env:
+          URL: https://smart-report-sv.duckdns.org/health
+        run: |
+          # Tres intentos: un corte de un segundo en la red de GitHub no es una
+          # caida, y un correo por eso enseña a ignorar los correos.
+          for intento in 1 2 3; do
+            if cuerpo=$(curl -sf --max-time 20 "$URL"); then
+              estado=$(echo "$cuerpo" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+              # /health da 200 aunque este degradado: el estado va en el cuerpo
+              # y hay que leerlo, no mirar el codigo HTTP.
+              if [ "$estado" = "ok" ]; then
+                echo "ok"
+                exit 0
+              fi
+              echo "::warning::intento $intento: estado '$estado'"
+              echo "$cuerpo" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("problemas:", d.get("issues"))'
+            else
+              echo "::warning::intento $intento: no contesta"
+            fi
+            sleep 20
+          done
+          echo "::error::produccion no esta sana: $URL"
+          exit 1
+
+      - name: El webhook de Telegram no acumula errores
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        # Sin el secreto configurado se salta: es un extra, no lo esencial.
+        if: env.BOT_TOKEN != ''
+        run: |
+          # Si Telegram no logra entregar los reportes, lo dice aqui. Un webhook
+          # que falla calla: el bot no contesta y nadie se entera.
+          info=$(curl -sf --max-time 20 "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo")
+          echo "$info" | python3 -c '
+          import json, sys, time
+          r = json.load(sys.stdin)["result"]
+          pendientes = r.get("pending_update_count", 0)
+          error = r.get("last_error_message")
+          hace = time.time() - r.get("last_error_date", 0)
+          print("pendientes:", pendientes, "| ultimo error:", error or "ninguno")
+          # Un error viejo no importa; uno de los ultimos 15 minutos con
+          # reportes acumulados, si.
+          if error and hace < 900 and pendientes > 0:
+              print("::error::Telegram no logra entregar los reportes:", error)
+              sys.exit(1)
+          '

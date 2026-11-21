@@ -8,6 +8,14 @@
  */
 import { z } from "zod";
 
+// Sin compilar validadores con `new Function`. Zod 4 lo hace para ir mas
+// rapido, y eso es evaluar texto como codigo: la Content-Security-Policy lo
+// bloquea, con razon. Zod ya caia solo al modo normal, pero intentandolo cada
+// vez y llenando la consola de avisos. Para el puñado de respuestas que valida
+// el tablero, la diferencia de velocidad no se nota. Va aqui porque los demas
+// clientes (asistente, actividad) importan este modulo.
+z.config({ jitless: true });
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {

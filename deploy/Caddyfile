@@ -25,6 +25,27 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "DENY"
+
+		# De donde puede cargar cosas la pagina. Si alguien lograra meter un
+		# <script> en el tablero —por un texto de un reporte mal escapado, por
+		# ejemplo—, el navegador no lo cargaria de ningun otro sitio ni le
+		# dejaria mandar datos fuera. Solo se permite lo que el tablero usa:
+		#   - teselas, estilos y tipografias del mapa: tiles.openfreemap.org
+		#   - fotos firmadas: el bucket de R2
+		#   - fotos de perfil de Google: *.googleusercontent.com
+		#   - el worker de MapLibre se sirve desde aqui y crea blobs
+		# 'unsafe-inline' en scripts porque Next hidrata con scripts en linea y
+		# el tema se aplica antes de pintar con otro; quitarlo exige nonces por
+		# peticion, que hacen dinamica cada pagina. Aun asi bloquea scripts de
+		# cualquier otro origen, que es lo que importa.
+		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.googleusercontent.com https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+
+		# Lo que la pagina no necesita, apagado: si algo intentara usar la
+		# camara o la ubicacion desde el tablero, el navegador ni preguntaria.
+		# Subir la foto del arreglo usa el selector de archivos del sistema, que
+		# no pasa por estos permisos.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"
+		Cross-Origin-Opener-Policy "same-origin"
 	}
 
 	log {

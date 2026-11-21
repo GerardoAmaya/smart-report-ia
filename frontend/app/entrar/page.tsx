@@ -192,7 +192,7 @@ export default function Entrar() {
             </div>
 
             <div className="space-y-2">
-              <Button asChild variant="outline" className="boton-brillo h-11 w-full text-sm transition-shadow hover:shadow-md">
+              <Button asChild variant="outline" className="h-11 w-full text-sm">
                 <a href={api.urlEntrarConGoogle()}>
                   <MarcaGoogle className="size-4" />
                   Entrar con Google
@@ -230,7 +230,7 @@ export default function Entrar() {
               <Button
                 type="submit"
                 disabled={enviando || !password}
-                className="boton-brillo h-10 w-full transition-shadow hover:shadow-md hover:shadow-primary/25"
+                className="h-10 w-full"
               >
                 <Eye className="size-4" />
                 {enviando ? "Entrando…" : "Entrar a mirar"}

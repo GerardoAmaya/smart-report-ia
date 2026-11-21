@@ -452,35 +452,6 @@
 }
 
 /*
- * Brillo que cruza un boton al pasar el raton. Solo al pasar: un boton que
- * brilla solo pide atencion todo el rato, y en la entrada ya hay bastante.
- */
-.boton-brillo {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
-.boton-brillo::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(
-    110deg,
-    transparent 35%,
-    color-mix(in oklab, var(--atencion) 28%, transparent) 50%,
-    transparent 65%
-  );
-  transform: translateX(-120%);
-  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  pointer-events: none;
-}
-.boton-brillo:hover::after,
-.boton-brillo:focus-visible::after {
-  transform: translateX(120%);
-}
-
-/*
  * Texto con degradado que se desplaza despacio: solo para la palabra que da
  * sentido al titular de la entrada. Verde de señalizacion a ambar de cono, la
  * misma pareja que el resto de la marca.
@@ -562,9 +533,6 @@
   .pulso-urgente,
   .flotar {
     animation: none !important;
-  }
-  .boton-brillo::after {
-    transition: none !important;
   }
 }
 

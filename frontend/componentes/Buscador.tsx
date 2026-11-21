@@ -43,10 +43,13 @@ export function Buscador({
 }) {
   const [abierto, setAbierto] = useState(false);
 
-  // La misma clave que la cola sin filtro: comparten cache y no se pide dos veces.
+  // Busca en los primeros 200 de la cola (el maximo de una pagina), no solo en
+  // los que la cola ya cargo: buscar es justo para encontrar lo que no se ve.
+  // Clave propia: la cola es paginada y guarda otra forma de dato. Empieza por
+  // "casos", asi que el tablero en vivo la refresca igual.
   const { data } = useQuery({
-    queryKey: ["casos", ""],
-    queryFn: () => api.casos(),
+    queryKey: ["casos", "buscador"],
+    queryFn: () => api.casos(undefined, { limite: 200 }),
     enabled: abierto,
   });
 

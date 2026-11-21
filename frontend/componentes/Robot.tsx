@@ -16,7 +16,7 @@
  * No pide nada nuevo al servidor: el número de urgentes del globo sale de la
  * cola que el tablero ya tiene en caché.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   AnimatePresence,
   animate,
@@ -29,7 +29,7 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { BorderBeam } from "@/components/ui/border-beam";
-import { api } from "@/lib/api";
+import { casosCargados, opcionesCola } from "@/lib/cola";
 import { cn } from "@/lib/utils";
 
 const FRASES = [
@@ -143,16 +143,14 @@ export function Robot({
   const ojoX = useSpring(objetivoX, { stiffness: 180, damping: 18, mass: 0.6 });
   const ojoY = useSpring(objetivoY, { stiffness: 180, damping: 18, mass: 0.6 });
 
-  // La cola de "Todo" que ya esta en cache. `enabled: false`: solo se lee lo
-  // que el tablero ya pidio; si no esta, el globo no menciona urgentes.
-  const { data: cola } = useQuery({
-    queryKey: ["casos", ""],
-    queryFn: () => api.casos(),
-    enabled: false,
-  });
-  const urgentes =
-    cola?.cases.filter((c) => c.severity === "alta" && c.status !== "closed")
-      .length ?? 0;
+  // La cola de "Todo" que ya esta en cache, con las mismas opciones que la cola
+  // para compartir su entrada. `enabled: false`: solo se lee lo que el tablero
+  // ya pidio; si no esta, el globo no menciona urgentes. Basta con las paginas
+  // cargadas: la cola ordena lo urgente primero.
+  const { data: cola } = useInfiniteQuery({ ...opcionesCola(""), enabled: false });
+  const urgentes = casosCargados(cola?.pages).filter(
+    (c) => c.severity === "alta" && c.status !== "closed",
+  ).length;
 
   const gesto: Gesto = arrastrando
     ? "sorpresa"

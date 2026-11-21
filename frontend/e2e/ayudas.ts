@@ -283,7 +283,19 @@ export async function buscarMiCaso(
   texto: string,
 ): Promise<{ casoId: string; clasificacionId: string | null }> {
   return esperarA(async () => {
-    const { cases } = await (await api.get(`${API}/board/cases?limite=200`)).json();
+    // Todas las paginas, no solo la primera: un caso nuevo y leve va al final
+    // del orden de la cola, y con la base de desarrollo crecida corrida tras
+    // corrida quedaba fuera de los primeros 200 y la prueba no lo encontraba.
+    const cases: { id: string; updated_at: string }[] = [];
+    let cursor: string | null = null;
+    do {
+      const q: string = cursor ? `&cursor=${cursor}` : "";
+      const pagina = await (await api.get(`${API}/board/cases?limite=200${q}`)).json();
+      cases.push(...pagina.cases);
+      cursor = pagina.next_cursor;
+    } while (cursor);
+    // El de esta prueba es de los ultimos en cambiar: se mira primero.
+    cases.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     for (const c of cases) {
       const d = await (await api.get(`${API}/board/cases/${c.id}`)).json();
       const mio = d.reports.find((r: { caption?: string }) => r.caption === texto);

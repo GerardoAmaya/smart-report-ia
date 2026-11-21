@@ -105,6 +105,14 @@ export const CasoSchema = z.object({
 });
 export type Caso = z.infer<typeof CasoSchema>;
 
+/** Una pagina de la cola: los casos, el cursor de la siguiente y el total. */
+export const PaginaCasosSchema = z.object({
+  cases: z.array(CasoSchema),
+  next_cursor: z.string().nullable(),
+  total: z.number(),
+});
+export type PaginaCasos = z.infer<typeof PaginaCasosSchema>;
+
 /** Lo unico que se pide sin sesion: si el invitado puede despachar. */
 export const ConfigPublicaSchema = z.object({ demo_can_dispatch: z.boolean() });
 
@@ -144,6 +152,9 @@ export const ReporteSchema = z.object({
       reason: z.string().nullable(),
       confirmed: z.boolean(),
       corrected: z.boolean(),
+      // La persona eligio sin propuesta del modelo. Opcional: una API anterior
+      // a este campo no lo manda.
+      chosen: z.boolean().optional(),
     })
     .nullable(),
   evidence: z.array(EvidenciaSchema),
@@ -252,12 +263,18 @@ export const api = {
       body: JSON.stringify(cambios),
     }),
 
-  casos: (filtros?: { status?: string; category?: string }) => {
+  /** Una pagina de la cola. `cursor` es el `next_cursor` de la anterior. */
+  casos: (
+    filtros?: { status?: string; category?: string },
+    pagina?: { cursor?: string | null; limite?: number },
+  ) => {
     const q = new URLSearchParams();
     if (filtros?.status) q.set("status", filtros.status);
     if (filtros?.category) q.set("category", filtros.category);
+    if (pagina?.cursor) q.set("cursor", pagina.cursor);
+    if (pagina?.limite) q.set("limite", String(pagina.limite));
     const cola = q.toString() ? `?${q}` : "";
-    return pedir(`/board/cases${cola}`, z.object({ cases: z.array(CasoSchema) }));
+    return pedir(`/board/cases${cola}`, PaginaCasosSchema);
   },
 
   caso: (id: string) => pedir(`/board/cases/${id}`, DetalleSchema),
@@ -317,10 +334,6 @@ export const api = {
       { method: "POST" },
     ),
 
-  cambiarEstado: (casoId: string, nuevo: string) =>
-    pedir(`/board/cases/${casoId}/status?nuevo=${nuevo}`, z.object({ ok: z.boolean(), status: z.string() }), {
-      method: "POST",
-    }),
 
   urlEntrarConGoogle: () => `${API_URL}/auth/google/start`,
 };

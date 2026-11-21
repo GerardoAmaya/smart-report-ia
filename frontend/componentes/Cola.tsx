@@ -11,13 +11,14 @@
  * aparece deslizandose, porque eso es informacion. Nada aparece con
  * desvanecido al hacer scroll.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { ImageOff, MapPin } from "lucide-react";
+import { ImageOff, LoaderCircle, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { api, type Caso } from "@/lib/api";
+import { type Caso } from "@/lib/api";
+import { casosCargados, opcionesCola } from "@/lib/cola";
 import { cn } from "@/lib/utils";
 import { categoria, hace } from "@/lib/textos";
 import { CargandoCola, Fallo, Vacio } from "./Estados";
@@ -41,13 +42,39 @@ export function Cola({
   filtro: string;
   onFiltrar: (f: string) => void;
 }) {
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["casos", filtro],
-    queryFn: () => api.casos(filtro ? { status: filtro } : undefined),
-    // Sin sondeo: el flujo en vivo avisa cuando algo cambia. Pedir cada diez
-    // segundos sin que haya cambiado nada es gasto, y dos mecanismos que
-    // hacen lo mismo se contradicen el dia que uno falla.
-  });
+  // Por paginas: con mas de 50 casos, los ultimos —nuevos, leves y de un
+  // reporte— no se veian nunca. Sin sondeo: el flujo en vivo invalida
+  // ["casos"] y se vuelven a pedir las paginas ya cargadas, en su sitio.
+  const { data: paginas, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery(opcionesCola(filtro));
+  const casos = paginas ? casosCargados(paginas.pages) : undefined;
+  const total = paginas?.pages[0]?.total;
+
+  // Otro filtro es otra lista: empieza arriba. Si no, se quedaba a la altura de
+  // la anterior, a media lista o mas abajo del final de una mas corta.
+  const centinelaFiltro = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    centinelaFiltro.current
+      ?.closest<HTMLElement>("[data-radix-scroll-area-viewport]")
+      ?.scrollTo({ top: 0 });
+  }, [filtro]);
+
+  // Pide la siguiente pagina cuando el final de la lista se acerca. Con margen
+  // por debajo, para que al bajar ya este cargando y no se note la espera.
+  const centinela = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = centinela.current;
+    if (!el || !hasNextPage) return;
+    const raiz = el.closest<HTMLElement>("[data-radix-scroll-area-viewport]");
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        if (entradas[0]?.isIntersecting && !isFetchingNextPage) fetchNextPage();
+      },
+      { root: raiz, rootMargin: "0px 0px 400px 0px" },
+    );
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Los casos que entraron mientras se miraba la cola, para iluminarlos. En la
   // primera carga no se marca nada: todo seria "nuevo" y el resplandor dejaria
@@ -55,8 +82,8 @@ export function Cola({
   const conocidos = useRef<{ filtro: string; ids: Set<string> } | null>(null);
   const [nuevos, setNuevos] = useState<Set<string>>(new Set());
   useEffect(() => {
-    if (!data) return;
-    const ids = data.cases.map((c) => c.id);
+    if (!casos) return;
+    const ids = casos.map((c) => c.id);
     const antes = conocidos.current;
     conocidos.current = { filtro, ids: new Set(ids) };
     if (!antes || antes.filtro !== filtro) return;
@@ -65,7 +92,8 @@ export function Cola({
     setNuevos(new Set(llegaron));
     const t = setTimeout(() => setNuevos(new Set()), 2200);
     return () => clearTimeout(t);
-  }, [data, filtro]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- casos sale de paginas
+  }, [paginas, filtro]);
 
   return (
     <div className="flex h-full flex-col">
@@ -94,6 +122,16 @@ export function Cola({
             <span className="relative">{f.etiqueta}</span>
           </button>
         ))}
+        {/* Cuantos hay con este filtro, no cuantos se cargaron: la lista llega
+            por paginas y el numero de abajo engañaria. */}
+        {total !== undefined && (
+          <span
+            className="ml-auto pr-1 font-mono text-xs tabular-nums text-muted-foreground"
+            title={`${total} ${total === 1 ? "caso" : "casos"} con este filtro`}
+          >
+            {total}
+          </span>
+        )}
       </div>
 
       {/* Radix envuelve el contenido en un `display: table` que crece con el
@@ -101,9 +139,10 @@ export function Cola({
           suspensivos. Como bloque, el ancho lo pone la columna y `truncate`
           vuelve a funcionar. */}
       <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
+        <div ref={centinelaFiltro} aria-hidden />
         {isLoading && <CargandoCola />}
         {error && <Fallo mensaje={(error as Error).message} reintentar={() => refetch()} />}
-        {data?.cases.length === 0 && (
+        {casos?.length === 0 && (
           <Vacio
             titulo={filtro ? "Nada con ese filtro" : "Todavía no hay casos"}
             detalle={
@@ -115,7 +154,7 @@ export function Cola({
         )}
 
         <AnimatePresence initial={false}>
-          {data?.cases.map((caso) => (
+          {casos?.map((caso) => (
             <Item
               key={caso.id}
               caso={caso}
@@ -125,6 +164,19 @@ export function Cola({
             />
           ))}
         </AnimatePresence>
+
+        <div ref={centinela} aria-hidden className="h-px" />
+        {isFetchingNextPage && (
+          <p className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+            <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
+            Cargando más…
+          </p>
+        )}
+        {casos && casos.length > 0 && !hasNextPage && (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            Son todos: {total ?? casos.length} {(total ?? casos.length) === 1 ? "caso" : "casos"}
+          </p>
+        )}
       </ScrollArea>
     </div>
   );

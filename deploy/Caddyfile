@@ -38,7 +38,11 @@
 		# el tema se aplica antes de pintar con otro; quitarlo exige nonces por
 		# peticion, que hacen dinamica cada pagina. Aun asi bloquea scripts de
 		# cualquier otro origen, que es lo que importa.
-		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.googleusercontent.com https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+		# Antes de aplicarla corrio en modo solo-informe y se recorrio el tablero
+		# entero en produccion: el unico aviso era Zod compilando validadores con
+		# new Function, apagado en lib/api.ts. Si se agrega un servicio externo
+		# (otro mapa, una fuente), hay que sumarlo aqui o el navegador lo bloquea.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.googleusercontent.com https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
 		# Lo que la pagina no necesita, apagado: si algo intentara usar la
 		# camara o la ubicacion desde el tablero, el navegador ni preguntaria.

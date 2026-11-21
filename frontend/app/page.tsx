@@ -163,7 +163,6 @@ function Tablero() {
               setColaMovil(false);
             }}
           />
-          <BotonAsistente alElegirCaso={elegir} />
           {/* Suelto en la barra y no en el menu: se cambia al pasar de la
               oficina a la calle, y escondido no lo encontraba nadie. */}
           <CambiarTema />
@@ -222,6 +221,10 @@ function Tablero() {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* El robot flota abajo a la derecha y abre el asistente: fuera del
+          encabezado, donde un boton mas no lo encontraba nadie. */}
+      <BotonAsistente alElegirCaso={elegir} enMapa={vista === "mapa" && !colaMovil} />
 
       <BarraMovil
         actual={colaMovil ? "cola" : vista}

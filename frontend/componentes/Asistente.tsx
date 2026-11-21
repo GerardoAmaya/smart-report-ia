@@ -14,10 +14,8 @@
 import { useMutation } from "@tanstack/react-query";
 import {
   ClipboardList,
-  LoaderCircle,
   RotateCcw,
   SendHorizontal,
-  Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
@@ -29,12 +27,12 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, SinSesion } from "@/lib/api";
 import { apiAsistente, type MensajeChat } from "@/lib/api-asistente";
 import { cn } from "@/lib/utils";
+import { Robot, RobotMini } from "./Robot";
 
 const SUGERENCIAS = [
   "¿Qué quedó pendiente hoy?",
@@ -63,13 +61,21 @@ function mensajeDeError(error: unknown): string {
   return "Algo falló al preguntar. Prueba de nuevo.";
 }
 
+/**
+ * El asistente entero: el robot flotante que lo abre y el panel del chat.
+ *
+ * Se entra por el robot y no por un boton del encabezado: un boton mas entre
+ * buscar, tema y perfil no lo encontraba nadie, y el robot dice de un vistazo
+ * que ahi hay alguien a quien preguntar.
+ */
 export function BotonAsistente({
   alElegirCaso,
-  className,
+  enMapa = false,
 }: {
   /** Abre un caso sin recargar. Sin él, el enlace navega a `/?caso=…`. */
   alElegirCaso?: (id: string) => void;
-  className?: string;
+  /** En el mapa el robot sube para no tapar la atribución. */
+  enMapa?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
@@ -116,18 +122,12 @@ export function BotonAsistente({
 
   return (
     <Sheet open={abierto} onOpenChange={setAbierto}>
-      <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label="Asistente"
-          className={cn("gap-1.5 max-lg:size-8 max-lg:px-0", className)}
-        >
-          <Sparkles className="size-3.5 max-lg:size-4" />
-          {/* En el celular, solo el icono: el texto no cabe junto al resto. */}
-          <span className="hidden lg:inline">Asistente</span>
-        </Button>
-      </SheetTrigger>
+      <Robot
+        onAbrir={() => setAbierto(true)}
+        pensando={preguntar.isPending}
+        abierto={abierto}
+        enMapa={enMapa}
+      />
       <SheetContent
         side="right"
         // Con el prefijo data-[side=right]: el Sheet trae w-3/4 y sm:max-w-sm con
@@ -137,7 +137,7 @@ export function BotonAsistente({
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" />
+            <RobotMini pensando={preguntar.isPending} />
             Pregúntale al tablero
           </SheetTitle>
           <SheetDescription>
@@ -182,7 +182,8 @@ export function BotonAsistente({
 
           {preguntar.isPending && (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <LoaderCircle className="size-3.5 animate-spin" />
+              {/* El robot piensa: el mismo que flota, con los ojos en puntos. */}
+              <RobotMini pensando className="size-9" />
               Consultando el tablero…
             </p>
           )}

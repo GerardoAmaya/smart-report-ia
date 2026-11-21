@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     rate_limit_ip_per_minute: int = 60
     rate_limit_user_per_hour: int = 20
 
+    # Entrada del invitado. La contraseña es publica (va en el README): lo que se
+    # protege es el servicio, no el secreto. 10 por minuto y por IP sobran para
+    # una persona que se equivoca al teclear y cortan a un script. El tope
+    # global, mas alto, frena a quien rota IPs sin cerrarle la puerta a un aula
+    # entera que entra a la vez detras de un mismo router (eso lo cubre el de IP).
+    demo_login_per_minute: int = 10
+    demo_login_global_per_minute: int = 300
+
     # Cuantos proxies de confianza hay delante. Cero significa usar la IP
     # del socket e ignorar X-Forwarded-For, que es lo correcto sin proxy:
     # esa cabecera la escribe cualquiera y falsearla saltaria el limite.

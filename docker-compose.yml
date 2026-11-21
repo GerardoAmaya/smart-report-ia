@@ -40,6 +40,11 @@ services:
       # Encendido aqui y apagado en produccion: las E2E y el guion de capturas
       # recorren el ciclo de despacho entrando como invitado.
       DEMO_CAN_DISPATCH: ${DEMO_CAN_DISPATCH:-true}
+      # Las E2E y el guion de capturas entran como invitado varias veces por
+      # minuto, todas desde la misma IP: con el limite de produccion (10)
+      # fallarian por algo que no es lo que prueban.
+      DEMO_LOGIN_PER_MINUTE: ${DEMO_LOGIN_PER_MINUTE:-1000}
+      DEMO_LOGIN_GLOBAL_PER_MINUTE: ${DEMO_LOGIN_GLOBAL_PER_MINUTE:-5000}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3100}
       ENVIRONMENT: ${ENVIRONMENT:-dev}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

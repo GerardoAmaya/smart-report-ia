@@ -11,11 +11,12 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 
-from app import auth, images, storage
+from app import auth, images, rate_limit, storage
 from app.config import settings
 from app.db import SesionBD
 from app.models import User
 from app.permissions import Role, permisos_de
+from app.security import client_ip, rate_limit_key
 
 log = logging.getLogger("smart_report.auth")
 
@@ -103,6 +104,44 @@ async def google_callback(request: Request, session: SesionBD):
     return RedirectResponse(settings.frontend_url)
 
 
+MUCHOS_INTENTOS = "Demasiados intentos. Espera un minuto."
+
+
+def _limitar_entrada_de_prueba(request: Request, session) -> None:
+    """Cuenta el intento, acierte o no, y corta si se paso.
+
+    Antes de mirar la contraseña: contar solo los fallidos protegeria un
+    secreto que ya es publico, y lo que se defiende aqui es el servicio. Va
+    primero por IP y despues el global, y el global cuenta aunque la IP ya se
+    haya pasado: asi quien insiste desde muchas IPs llena el global igual.
+    """
+    por_ip = rate_limit.hit(
+        session,
+        scope="demo_ip",
+        key=rate_limit_key(client_ip(request)),
+        limit=settings.demo_login_per_minute,
+        window_seconds=60,
+    )
+    global_ = rate_limit.hit(
+        session,
+        scope="demo_global",
+        key=rate_limit_key("demo:global"),
+        limit=settings.demo_login_global_per_minute,
+        window_seconds=60,
+    )
+    # Se confirma antes de responder: un 429 deshace la transaccion de la
+    # peticion, y sin esto el contador no subiria nunca para quien ya se paso.
+    session.commit()
+    for resultado in (por_ip, global_):
+        if not resultado.allowed:
+            log.warning("entrada de prueba limitada (%s/%s)", resultado.count, resultado.limit)
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                MUCHOS_INTENTOS,
+                headers={"Retry-After": str(resultado.retry_after_seconds)},
+            )
+
+
 @router.post("/demo")
 def entrar_de_prueba(
     request: Request,
@@ -115,6 +154,8 @@ def entrar_de_prueba(
     no se puede mostrar. Ese usuario **no puede borrar**: va a entrar gente a
     tocar todo, que para eso esta.
     """
+    _limitar_entrada_de_prueba(request, session)
+
     if not auth.password_de_prueba_valida(password):
         # El mismo mensaje y el mismo codigo pase lo que pase: distinguir
         # "usuario no existe" de "contraseña mala" le dice a quien prueba cual

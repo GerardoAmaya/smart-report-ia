@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { CambiarTema } from "@/componentes/CambiarTema";
 import {
   EntraEnCascada,
@@ -86,8 +86,16 @@ export default function Entrar() {
       // navegando, no. Lo encontro una prueba extremo a extremo.
       cliente.setQueryData(["yo"], perfil);
       router.push("/");
-    } catch {
-      setError("Esa contraseña no es. Revisala y probá de nuevo.");
+    } catch (err) {
+      // El 429 se dice tal cual: con el mensaje de contraseña mala, quien se
+      // paso del limite seguiria probando y alargando el bloqueo.
+      if (err instanceof ApiError && err.status === 429) {
+        setError("Demasiados intentos. Espera un minuto.");
+      } else if (err instanceof ApiError && err.status !== 401) {
+        setError("No se pudo entrar ahora. Probá de nuevo en un momento.");
+      } else {
+        setError("Esa contraseña no es. Revisala y probá de nuevo.");
+      }
     } finally {
       setEnviando(false);
     }

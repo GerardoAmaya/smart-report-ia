@@ -646,7 +646,12 @@ cambia ni foto ni nombre: es una cuenta de todo el publico, y seria grafiti.
 **El asistente lo abre un robot, el unico control con nombre «Asistente».** Es
 un dibujo propio en SVG con la paleta y un casco de obra, no un personaje
 prestado. Se arrastra y recuerda donde lo dejaste; un movimiento de mas de 5 px
-es arrastre y no abre el panel. Su globo da el numero real de urgentes sacado de
+es arrastre y no abre el panel. El arrastre es propio, con Pointer Events, y no
+el `drag` de Motion: con `dragConstraints` dados por un elemento, Motion vuelve
+a medir y reubica lo arrastrado en cada cambio de tamaño de la ventana, y en el
+celular la barra del navegador, que aparece y se oculta al desplazarse, lo hacia
+saltar al medio o hasta arriba. Tras un cambio de tamaño se reacomoda una sola
+vez, cuando la ventana se queda quieta. Su globo da el numero real de urgentes sacado de
 la cache de la cola, sin pedir nada al servidor. Quieto con «reducir
 movimiento».
 

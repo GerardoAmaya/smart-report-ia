@@ -89,8 +89,10 @@ const ZOOM_3D_UN_CASO = 15.5;
  *
  * Fija no sirve: a zoom 13 una columna de 110 m es un punto, y a zoom 16 la
  * misma es una torre que tapa la colonia. Con la altura que baja al acercarse,
- * una columna de **un** reporte queda siempre varias veces por encima del
+ * una columna de **un** reporte queda unas tres o cuatro veces por encima del
  * edificio tipico (10 a 20 m) y una de muchos destaca sin salirse del cuadro.
+ * La primera version la ponia varias veces mas alta y, con un solo reporte, se
+ * leia como una torre: la altura tiene que estar en proporcion a lo que dice.
  * Lineal en reportes y no raiz: aqui se comparan alturas de un vistazo y una
  * escala deformada mentiria. Con tope.
  *
@@ -105,13 +107,13 @@ const ALTURA_COLUMNA = [
   ["linear"],
   ["zoom"],
   12,
-  ["*", CRECE, ["min", 2600, ["+", 260, ["*", ["get", "reportes"], 160]]]],
+  ["*", CRECE, ["min", 1500, ["+", 120, ["*", ["get", "reportes"], 90]]]],
   14,
-  ["*", CRECE, ["min", 1600, ["+", 150, ["*", ["get", "reportes"], 90]]]],
+  ["*", CRECE, ["min", 900, ["+", 70, ["*", ["get", "reportes"], 50]]]],
   16,
-  ["*", CRECE, ["min", 900, ["+", 80, ["*", ["get", "reportes"], 45]]]],
+  ["*", CRECE, ["min", 500, ["+", 40, ["*", ["get", "reportes"], 25]]]],
   18,
-  ["*", CRECE, ["min", 300, ["+", 35, ["*", ["get", "reportes"], 14]]]],
+  ["*", CRECE, ["min", 160, ["+", 18, ["*", ["get", "reportes"], 8]]]],
 ];
 
 type Modo = "2d" | "3d";

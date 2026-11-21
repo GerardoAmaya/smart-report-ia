@@ -80,12 +80,16 @@ type Coleccion = {
  * y no en cada movimiento de la rueda.
  */
 export function radioParaZoom(zoom: number): number {
-  if (zoom < 13.5) return 320;
-  if (zoom < 14.5) return 220;
-  if (zoom < 15.5) return 150;
-  if (zoom < 16.5) return 100;
-  if (zoom < 17.5) return 60;
-  return 40;
+  // Mas o menos la mitad de lo que se probo primero: con un solo reporte, un
+  // hexagono de 100 m a zoom 15 ocupaba una manzana y tapaba la carretera de al
+  // lado, y lo que se lee es "aqui hay algo grande". Una columna es un marcador
+  // de donde se reporta, no una mancha sobre la colonia.
+  if (zoom < 13.5) return 160;
+  if (zoom < 14.5) return 110;
+  if (zoom < 15.5) return 70;
+  if (zoom < 16.5) return 45;
+  if (zoom < 17.5) return 30;
+  return 20;
 }
 
 /**

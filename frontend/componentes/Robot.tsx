@@ -26,7 +26,14 @@ import {
   useSpring,
   type MotionValue,
 } from "motion/react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { BorderBeam } from "@/components/ui/border-beam";
 import { casosCargados, opcionesCola } from "@/lib/cola";
@@ -77,6 +84,29 @@ const CLAVE_POSICION = "smart-report:robot";
 const UMBRAL_ARRASTRE_PX = 5;
 // Por debajo del encabezado: arrastrado mas arriba taparia buscar y perfil.
 const TOPE_SUPERIOR_PX = 64;
+// Tras un cambio de tamaño se espera a que la ventana se quede quieta antes de
+// reacomodar el robot: en el celular la barra del navegador aparece y se oculta
+// varias veces por segundo mientras se desplaza.
+const ESPERA_TAMANO_MS = 150;
+
+const acotar = (v: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, v));
+
+/**
+ * Un arrastre en curso, con raton o con dedo. Los limites se miden al apretar,
+ * cuando el robot esta quieto bajo el dedo, y son cuanto puede moverse desde ahi.
+ */
+type Arrastre = {
+  id: number;
+  inicioX: number;
+  inicioY: number;
+  desdeX: number;
+  desdeY: number;
+  // Ya paso del umbral: es arrastre y no clic.
+  moviendo: boolean;
+  min: { x: number; y: number };
+  max: { x: number; y: number };
+};
 
 function leerPosicion(): Posicion {
   try {
@@ -130,6 +160,14 @@ export function Robot({
   const boton = useRef<HTMLButtonElement>(null);
   const limites = useRef<HTMLDivElement>(null);
   const arrastro = useRef(false);
+  const arrastre = useRef<Arrastre | null>(null);
+  // La posicion vigente para el reacomodo por cambio de tamaño: leida dentro
+  // del efecto, se quedaba con la del primer render y, tras moverlo, un cambio
+  // de tamaño lo devolvia a donde estaba al cargar la pagina.
+  const posicionActual = useRef(posicion);
+  useEffect(() => {
+    posicionActual.current = posicion;
+  }, [posicion]);
 
   // El desplazamiento respecto de su sitio de siempre. En x solo hay dos
   // valores en reposo, pegado a un lado o al otro; en y, lo que eligio.
@@ -316,13 +354,22 @@ export function Robot({
     [dx, dy, reducido],
   );
 
+  // Al cargar y cuando la ventana termina de cambiar de tamaño; al soltarlo ya
+  // se coloca con muelle. Nunca a mitad de un arrastre.
   useEffect(() => {
-    colocar(posicion, false);
-    const alCambiar = () => colocar(posicion, false);
+    colocar(posicionActual.current, false);
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    const alCambiar = () => {
+      clearTimeout(espera);
+      espera = setTimeout(() => {
+        if (!arrastre.current) colocar(posicionActual.current, false);
+      }, ESPERA_TAMANO_MS);
+    };
     window.addEventListener("resize", alCambiar);
-    return () => window.removeEventListener("resize", alCambiar);
-    // Solo al cargar y al cambiar el tamaño: al soltarlo ya se coloca con muelle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      clearTimeout(espera);
+      window.removeEventListener("resize", alCambiar);
+    };
   }, [colocar]);
 
   // Al soltarlo: se pega al borde mas cercano con un muelle y se recuerda. Si
@@ -339,6 +386,60 @@ export function Robot({
     setPosicion(nueva);
     guardarPosicion(nueva);
     colocar(nueva, true);
+  };
+
+  // Arrastre propio con Pointer Events, igual con raton que con dedo: mas de
+  // UMBRAL_ARRASTRE_PX con el boton apretado es arrastre y si no, un clic. No
+  // usa el drag de Motion: con dragConstraints dados por un elemento, Motion
+  // vuelve a medir y reubica lo arrastrado en cada cambio de tamaño de la
+  // ventana, y en el celular la barra del navegador, al aparecer y ocultarse
+  // durante un desplazamiento, lo hacia saltar al medio o hasta arriba.
+  const alApretar = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    arrastro.current = false;
+    const l = limites.current?.getBoundingClientRect();
+    if (!l) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    // Si todavia se estaba acomodando en el borde, se agarra desde donde esta.
+    dx.stop();
+    dy.stop();
+    arrastre.current = {
+      id: e.pointerId,
+      inicioX: e.clientX,
+      inicioY: e.clientY,
+      desdeX: dx.get(),
+      desdeY: dy.get(),
+      moviendo: false,
+      min: { x: l.left - r.left, y: l.top - r.top },
+      max: { x: l.right - r.right, y: l.bottom - r.bottom },
+    };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Sin captura el arrastre sigue mientras el puntero este encima.
+    }
+  };
+
+  const alMover = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const a = arrastre.current;
+    if (!a || a.id !== e.pointerId) return;
+    const ox = e.clientX - a.inicioX;
+    const oy = e.clientY - a.inicioY;
+    if (!a.moviendo) {
+      if (Math.hypot(ox, oy) <= UMBRAL_ARRASTRE_PX) return;
+      a.moviendo = true;
+      arrastro.current = true;
+      setArrastrando(true);
+    }
+    dx.set(a.desdeX + acotar(ox, a.min.x, a.max.x));
+    dy.set(a.desdeY + acotar(oy, a.min.y, a.max.y));
+  };
+
+  const alTerminar = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const a = arrastre.current;
+    if (!a || a.id !== e.pointerId) return;
+    arrastre.current = null;
+    if (a.moviendo) soltar();
   };
 
   // El clic: estrellas en los ojos y un "boing", y el panel se abre a los
@@ -391,23 +492,7 @@ export function Robot({
         transition={{ type: "spring", stiffness: 260, damping: 26 }}
         style={{ pointerEvents: abierto ? "none" : undefined }}
       >
-        <motion.div
-          className="relative"
-          style={{ x: dx, y: dy }}
-          drag
-          dragConstraints={limites}
-          dragElastic={0.06}
-          dragMomentum={false}
-          onPointerDown={() => {
-            arrastro.current = false;
-          }}
-          onDragStart={() => setArrastrando(true)}
-          onDrag={(_, info) => {
-            if (Math.hypot(info.offset.x, info.offset.y) > UMBRAL_ARRASTRE_PX)
-              arrastro.current = true;
-          }}
-          onDragEnd={soltar}
-        >
+        <motion.div className="relative" style={{ x: dx, y: dy }}>
           <AnimatePresence>
             {globo && !abierto && !dormido && !arrastrando && (
               <motion.button
@@ -455,6 +540,11 @@ export function Robot({
             aria-label="Asistente"
             title="Pregúntale al tablero"
             onClick={alHacerClic}
+            onPointerDown={alApretar}
+            onPointerMove={alMover}
+            onPointerUp={alTerminar}
+            onPointerCancel={alTerminar}
+            onLostPointerCapture={alTerminar}
             onPointerEnter={() => setHover(true)}
             onPointerLeave={() => setHover(false)}
             // Sin onFocus: el foco se quedaba en el boton tras un clic o un

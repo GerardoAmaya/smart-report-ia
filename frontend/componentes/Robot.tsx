@@ -121,7 +121,6 @@ export function Robot({
   const [dormido, setDormido] = useState(false);
   const [reaccion, setReaccion] = useState(false);
   const [globo, setGlobo] = useState<string | null>(null);
-  const [elevacion, setElevacion] = useState(0);
   const [arrastrando, setArrastrando] = useState(false);
   // El componente solo se pinta en el cliente (el tablero espera la sesion),
   // asi que leer el almacenamiento al iniciar no descuadra la hidratacion.
@@ -292,29 +291,6 @@ export function Robot({
     };
   }, [reducido, abierto]);
 
-  // Los avisos de Sonner salen abajo a la derecha, justo donde vive el robot:
-  // cuando hay alguno, el robot sube por encima en vez de taparlo.
-  useEffect(() => {
-    const medir = () => {
-      const avisos = document.querySelectorAll<HTMLElement>(
-        "[data-sonner-toast]",
-      );
-      let alto = 0;
-      avisos.forEach((a) => {
-        const r = a.getBoundingClientRect();
-        if (r.height > 0) alto = Math.max(alto, window.innerHeight - r.top);
-      });
-      setElevacion(alto > 0 ? alto - 8 : 0);
-    };
-    const observador = new MutationObserver(() => requestAnimationFrame(medir));
-    observador.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-    });
-    return () => observador.disconnect();
-  }, []);
-
   // Coloca el robot donde dice `p`, dentro de la ventana. Se usa al soltarlo,
   // al cargar la pagina y cuando la ventana cambia de tamaño.
   const colocar = useCallback(
@@ -375,6 +351,7 @@ export function Robot({
       arrastro.current = false;
       return;
     }
+    setHover(false);
     if (reducido) return onAbrir();
     setReaccion(true);
     setTimeout(onAbrir, ABRIR_TRAS_MS);
@@ -410,7 +387,6 @@ export function Robot({
             "max-lg:bottom-[calc(6rem+env(safe-area-inset-bottom))] lg:bottom-12",
         )}
         animate={{
-          y: enSuSitio ? -elevacion : 0,
           scale: abierto ? 0.6 : 1,
           opacity: abierto ? 0 : 1,
         }}
@@ -483,8 +459,10 @@ export function Robot({
             onClick={alHacerClic}
             onPointerEnter={() => setHover(true)}
             onPointerLeave={() => setHover(false)}
-            onFocus={() => setHover(true)}
-            onBlur={() => setHover(false)}
+            // Sin onFocus: el foco se quedaba en el boton tras un clic o un
+            // arrastre, y el robot seguia contento, saludando y con la cabeza
+            // ladeada aunque el raton ya estuviera lejos. Con teclado se ve el
+            // anillo de foco, que es lo que hace falta para saber donde se esta.
             className={cn(
               "group relative block size-18 touch-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:size-23",
               arrastrando ? "cursor-grabbing" : "cursor-grab",
@@ -509,8 +487,9 @@ export function Robot({
                 flotar
                   ? { y: [0, -6, 0], rotate: 0 }
                   : arrastrando && !reducido
-                    ? // Agarrado: colgando ladeado del dedo.
-                      { y: -4, rotate: 12 }
+                    ? // Agarrado: un poco levantado, sin ladearse. Ladeado se
+                      // veia como si se quedara trabado girando.
+                      { y: -4, rotate: 0 }
                     : // Al acercarse alguien, un saltito de saludo.
                       { y: hover && !reducido ? -9 : 0, rotate: 0 }
               }

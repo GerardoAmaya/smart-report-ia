@@ -33,9 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Tema>
           <Proveedores>
             <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-            {/* Confirma lo que hizo una accion de despacho. Abajo a la derecha:
-                lejos de la cola, que es donde estan los ojos. */}
-            <Toaster position="bottom-right" closeButton />
+            {/* Confirma lo que hizo una accion de despacho. Arriba al centro y no
+                abajo a la derecha, que es donde vive el robot: ahi el robot subia
+                para esquivarlos y bajaba al irse, y con varios avisos seguidos se
+                iba hasta media pantalla. */}
+            <Toaster position="top-center" closeButton />
           </Proveedores>
         </Tema>
       </body>

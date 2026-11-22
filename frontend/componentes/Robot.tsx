@@ -159,6 +159,8 @@ export function Robot({
   );
   const boton = useRef<HTMLButtonElement>(null);
   const limites = useRef<HTMLDivElement>(null);
+  // La caja fija que lo contiene: su sitio de siempre, sin el desplazamiento.
+  const caja = useRef<HTMLDivElement>(null);
   const arrastro = useRef(false);
   const arrastre = useRef<Arrastre | null>(null);
   // La posicion vigente para el reacomodo por cambio de tamaño: leida dentro
@@ -327,6 +329,20 @@ export function Robot({
     };
   }, [reducido, abierto]);
 
+  // La y acotada: nunca por debajo de su sitio (que ya esta sobre la barra
+  // inferior del celular) ni por encima del encabezado. Se mide con offsetTop,
+  // que es el sitio de la caja sin transformaciones, y no con el rectangulo del
+  // boton menos `dy`: el valor de `dy` cambia al instante y el rectangulo en el
+  // siguiente cuadro, y dos llamadas seguidas —el doble efecto de React en
+  // desarrollo— leian uno nuevo con el otro viejo y lo bajaban de mas.
+  const acotarY = useCallback((y: number) => {
+    const sitio = caja.current?.offsetTop;
+    const deseada = Math.min(0, y);
+    return sitio === undefined
+      ? deseada
+      : Math.max(deseada, TOPE_SUPERIOR_PX - sitio);
+  }, []);
+
   // Coloca el robot donde dice `p`, dentro de la ventana. Se usa al soltarlo,
   // al cargar la pagina y cuando la ventana cambia de tamaño.
   const colocar = useCallback(
@@ -337,12 +353,7 @@ export function Robot({
         p?.lado === "izq"
           ? -(window.innerWidth - b.offsetWidth - 2 * margen())
           : 0;
-      // y acotada: nunca por debajo de su sitio (que ya esta sobre la barra
-      // inferior del celular) ni por encima del encabezado.
-      const rect = b.getBoundingClientRect();
-      const arriba = rect.top - (dy.get() - (p?.y ?? 0));
-      let y = Math.min(0, p?.y ?? 0);
-      if (arriba < TOPE_SUPERIOR_PX) y += TOPE_SUPERIOR_PX - arriba;
+      const y = acotarY(p?.y ?? 0);
       if (suave && !reducido) {
         animate(dx, x, { type: "spring", stiffness: 380, damping: 30 });
         animate(dy, y, { type: "spring", stiffness: 380, damping: 30 });
@@ -351,7 +362,7 @@ export function Robot({
         dy.set(y);
       }
     },
-    [dx, dy, reducido],
+    [dx, dy, reducido, acotarY],
   );
 
   // Al cargar y cuando la ventana termina de cambiar de tamaño; al soltarlo ya
@@ -381,7 +392,9 @@ export function Robot({
     if (!b) return;
     const r = b.getBoundingClientRect();
     const lado = r.left + r.width / 2 < window.innerWidth / 2 ? "izq" : "der";
-    const y = Math.min(0, dy.get());
+    // Se guarda ya acotada: soltado por encima del tope, lo guardado seria un
+    // sitio donde nunca estuvo.
+    const y = acotarY(dy.get());
     const nueva: Posicion = lado === "der" && y > -24 ? null : { lado, y };
     setPosicion(nueva);
     guardarPosicion(nueva);
@@ -477,6 +490,7 @@ export function Robot({
         className="pointer-events-none fixed inset-x-2 top-14 bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-2"
       />
       <motion.div
+        ref={caja}
         className={cn(
           "fixed right-4 z-40 lg:right-6",
           // En el celular, por encima de la barra inferior y del borde de gestos.

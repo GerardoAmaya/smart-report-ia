@@ -41,6 +41,11 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: eslint
         update-types: ["version-update:semver-major"]
+      # Los tipos de Node siguen al Node que corre, no al ultimo: con los de una
+      # version mayor, tsc acepta APIs que en el 24 no existen y el fallo sale
+      # en ejecucion. Suben cuando suba la imagen.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 
@@ -55,6 +60,14 @@ updates:
     groups:
       imagenes:
         patterns: ["*"]
+    ignore:
+      # Cambiar de Python o de Node es decision aparte, no un parche semanal:
+      # CI prueba con 3.13 y 24, y una imagen con otro runtime desplegaria algo
+      # que nada probo. Pasó: 3.15 llego antes que las ruedas de psycopg.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 

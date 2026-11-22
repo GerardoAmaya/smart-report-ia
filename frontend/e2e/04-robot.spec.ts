@@ -67,3 +67,22 @@ test("el robot arrastrado se queda donde lo dejaron aunque cambie la ventana", a
 
   expect(await quieto(page)).toEqual(dejado);
 });
+
+test("el robot subido hasta el tope aparece en el mismo sitio al recargar", async ({ page }) => {
+  // Soltado por encima del tope, se guardaba la y sin acotar, y al recargar el
+  // reacomodo lo bajaba de mas: tantos pixeles como se hubiera pasado.
+  await entrarComoPrueba(page);
+  const robot = page.getByRole("button", { name: "Asistente" });
+  await expect(robot).toBeVisible();
+  const caja = (await robot.boundingBox())!;
+
+  await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(200, 0, { steps: 15 });
+  await page.mouse.up();
+  const dejado = await quieto(page);
+
+  await page.reload();
+  await expect(robot).toBeVisible();
+  expect(await quieto(page)).toEqual(dejado);
+});

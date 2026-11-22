@@ -3,14 +3,14 @@ name = "smart-report-api"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi[standard]==0.141.1",
-    "uvicorn[standard]==0.52.4",
-    "sqlalchemy==2.0.52",
-    "alembic==1.20.0",
-    "psycopg[binary]==3.3.5",
-    "geoalchemy2==0.20.0",
-    "pydantic-settings==2.15.0",
-    "anthropic==1.5.0",
+    "fastapi[standard]==0.163.2",
+    "uvicorn[standard]==0.54.0",
+    "sqlalchemy==2.1.9",
+    "alembic==1.20.1",
+    "psycopg[binary]==3.3.9",
+    "geoalchemy2==0.21.0",
+    "pydantic-settings==2.16.3",
+    "anthropic==2.10.0",
     # PTB se usa como biblioteca, no como framework: los tipos del esquema de
     # Telegram y nada mas. El enrutado ya lo hace FastAPI.
     "python-telegram-bot==22.8",
@@ -18,7 +18,7 @@ dependencies = [
     "httpx==0.28.1",
     # Almacenamiento de objetos. Sincrono: corre en el trabajador, fuera del
     # camino del webhook. aioboto3 clavaria una version vieja de aiobotocore.
-    "boto3==1.43.93",
+    "boto3==1.44.5",
     # Miniaturas y validacion. Abrir la imagen comprueba mas que olfatear
     # sus primeros bytes, y ahorra libmagic como dependencia del sistema.
     # 13.0.0 y no 12.x: pip-audit encontro 42 vulnerabilidades en 12.3.0, y
@@ -26,15 +26,15 @@ dependencies = [
     "pillow==13.0.0",
     # Entrada con Google. Se construye el cliente al vuelo, no al importar.
     # 1.9.1: la version minima que corrige las 8 vulnerabilidades de 1.8.0.
-    "authlib==1.9.1",
+    "authlib==1.9.9",
     # Firma la cookie de sesion de Starlette.
     "itsdangerous==2.2.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.1.1",
-    "ruff==0.16.7",
+    "pytest==9.2.0",
+    "ruff==0.17.5",
     # Revisa las dependencias contra la base de vulnerabilidades de PyPI. En el
     # extra de desarrollo y no en la imagen: corre en CI, no en el servidor.
     "pip-audit==2.10.1",

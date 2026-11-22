@@ -256,7 +256,7 @@ El razonamiento completo, y lo que cada decisión costó descubrir, está en
 | 4 · Agrupación | 🟡 abierta | faltan 200 reportes agrupados a mano |
 | 5 · El tablero | 🟡 abierta | falta que alguien que no lo vio lo entienda solo |
 | 6 · Despacho y cierre | ✅ cerrada | ciclo real completo, de la foto al aviso de cerrado |
-| 7 · Tiempo real y E2E | ✅ cerrada | SSE sobre `LISTEN/NOTIFY`, 9 recorridos en CI |
+| 7 · Tiempo real y E2E | ✅ cerrada | SSE sobre `LISTEN/NOTIFY`, 11 recorridos en CI |
 | 8 · Despliegue | ✅ cerrada | un reporte real de punta a punta en producción, con su costo medido |
 
 Las fases abiertas lo están porque **sus verificaciones piden datos que todavía
@@ -323,7 +323,7 @@ Usa un bot **distinto** del de producción: un bot admite un solo webhook, y
 |---|---|
 | `make test` | pytest contra la base levantada |
 | `make lint` | ruff, ESLint y `tsc --noEmit` |
-| `make e2e` | los nueve recorridos contra el sistema levantado |
+| `make e2e` | los once recorridos contra el sistema levantado |
 | `make tunnel` | túnel HTTPS y registro del webhook en Telegram |
 | `make bench` · `make accuracy` · `make grouping-eval` | los que **miden**: costo, exactitud y las dos tasas de agrupación |
 

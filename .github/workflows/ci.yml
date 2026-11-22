@@ -232,7 +232,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - name: Los tres recorridos
+      - name: Los recorridos
         run: make e2e args="--reporter=list"
 
       - name: Que paso si fallo

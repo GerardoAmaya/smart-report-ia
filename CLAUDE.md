@@ -53,9 +53,9 @@ que existe:
 - Despacho: asignar cuadrilla, cerrar con foto de evidencia, y **aviso de
   vuelta a todos los que reportaron**, encolado y con reintentos
 - Tablero en vivo por SSE sobre `LISTEN/NOTIFY`, sin sondeo
-- Nueve pruebas extremo a extremo con Playwright contra el sistema levantado
+- Once pruebas extremo a extremo con Playwright contra el sistema levantado
 - Veinte migraciones, una por tabla, y seeders versionados aparte
-- 337 pruebas y 9 recorridos en verde, CI en verde
+- 337 pruebas y 11 recorridos en verde, CI en verde
 
 **La fase 6 se cerró el 15 de septiembre de 2026.** Un reporte real desde un
 teléfono recorrió todo —foto, ubicación, propuesta, confirmación, asignación,
@@ -651,8 +651,8 @@ el `drag` de Motion: con `dragConstraints` dados por un elemento, Motion vuelve
 a medir y reubica lo arrastrado en cada cambio de tamaño de la ventana, y en el
 celular la barra del navegador, que aparece y se oculta al desplazarse, lo hacia
 saltar al medio o hasta arriba. Tras un cambio de tamaño se reacomoda una sola
-vez, cuando la ventana se queda quieta. Su globo da el numero real de urgentes sacado de
-la cache de la cola, sin pedir nada al servidor. Quieto con «reducir
+vez, cuando la ventana se queda quieta. Su globo da el numero real de urgentes
+sacado de la cache de la cola, sin pedir nada al servidor. Quieto con «reducir
 movimiento».
 
 **Librerias de interfaz: del ecosistema de shadcn, no MUI ni Mantine.** MUI y
@@ -753,7 +753,7 @@ no del proyecto:
 | `make accuracy` | exactitud de clasificación, con las confirmaciones |
 | `make grouping` | casos y evidencia de cada unión |
 | `make grouping-eval f=…` | las dos tasas, por separado |
-| `make e2e` | los tres recorridos contra el sistema levantado |
+| `make e2e` | los once recorridos contra el sistema levantado |
 | `make e2e-up` | solo levanta el sistema con el Telegram falso |
 | `make revision m="…"` | nueva migración autogenerada |
 | `make nuke` | baja todo y borra los datos |
